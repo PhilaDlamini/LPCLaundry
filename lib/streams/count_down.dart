@@ -53,5 +53,5 @@ class CountDown {
     });
   }
 
-  Stream<String> get stream => _controller.stream;
+  Stream<String> get stream => _controller.stream.asBroadcastStream(); //This might be the problem??
 }

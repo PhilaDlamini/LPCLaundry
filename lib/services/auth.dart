@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/services/database.dart';
+import 'package:laundryqueue/services/shared_preferences.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -48,8 +49,7 @@ class AuthService {
           email: email, password: password);
 
       if (result.user != null) {
-        User user =
-            User(uid: result.user.uid, name: name, room: room, block: block);
+        User user = User(uid: result.user.uid, name: name, room: room, block: block);
         await DatabaseService(uid: user.uid).updateUserInfo(user.toMap());
         return user;
       }
@@ -59,8 +59,10 @@ class AuthService {
     }
   }
 
-  // Sign out
+  // Signs the user user out
   Future<dynamic> signOut() async {
+    //Reset preferences for the next user
+    await Preferences.initializePreferences();
     try {
       return await _auth.signOut();
     } catch (e) {

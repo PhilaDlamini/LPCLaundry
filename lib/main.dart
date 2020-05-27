@@ -4,13 +4,13 @@ import 'package:laundryqueue/screens/home/home.dart';
 import 'package:laundryqueue/screens/home/pages/queue_page.dart';
 import 'package:laundryqueue/screens/home/pages/settings.dart';
 import 'package:laundryqueue/screens/home/pages/queued.dart';
+import 'package:laundryqueue/screens/home/pages/turn_skipped.dart';
 import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/wrapper.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   runApp(StreamProvider<FirebaseUser>.value(
     value: AuthService().userStream,
    catchError: (context, err) {
@@ -27,7 +27,8 @@ void main() {
         '/home': (BuildContext context) => Home(),
         '/queuePage': (BuildContext context) => QueuePage(),
         '/settings': (BuildContext context) => Settings(),
-        '/queueList' : (BuildContext context) => QueuedList()
+        '/queueList' : (BuildContext context) => Queued(),
+        '/queueSkipped' : (BuildContext context) => TurnSkipped()
       },
     ),
   ));

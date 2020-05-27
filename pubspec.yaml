@@ -29,6 +29,8 @@ dependencies:
   cloud_firestore: ^0.13.5
   flutter_local_notifications: ^1.4.3
   shared_preferences: ^0.5.4
+  android_alarm_manager: ^0.4.5+11
+  equatable: ^0.6.0
 
 
 dev_dependencies:

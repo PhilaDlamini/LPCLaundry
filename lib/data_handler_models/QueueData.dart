@@ -1,5 +1,5 @@
-import 'package:laundryqueue/models/Queue.dart';
-import 'User.dart';
+import 'package:laundryqueue/models/QueueInstance.dart';
+import '../models/User.dart';
 
 class QueueData {
 
@@ -16,7 +16,7 @@ class QueueData {
   String get machineNumber => key.split(':')[1].trim();
 
   bool get userQueued {
-    for(Queue queue in queueInstances) {
+    for(QueueInstance queue in queueInstances) {
       if(queue.user.uid == user.uid) {
         return true;
       }
@@ -24,13 +24,14 @@ class QueueData {
     return false;
   }
 
-  List<Queue> get queueInstances {
-    List<Queue> users = List<Queue>();
+  List<QueueInstance> get queueInstances {
+    List<QueueInstance> users = List<QueueInstance>();
 
     for(var user in data[key]['queue']) {
-      users.add(Queue.fromMap(user));
+      users.add(QueueInstance.fromMap(user));
     }
     return users;
   }
 
+  String toString() => '$data';
 }

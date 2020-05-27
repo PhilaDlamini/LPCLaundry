@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:laundryqueue/services/auth.dart';
@@ -49,13 +50,12 @@ class RegisterState extends State<Register> {
             height: 80,
             decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: _image == null
-                      ? NetworkImage(
-                          "https://tg-cdn.azureedge.net/sites/default/files/images/paragraph/italrb/easy_guide_grass.jpg")
-                      : Image.file(_image),
-                  fit: BoxFit.fill,
-                ),
+//                image: DecorationImage(
+//                  image: _image == null
+//                      ? NetworkImage('ljfwoi')
+//                      : Image.file(_image),
+//                  fit: BoxFit.fill,
+//                ),
                 border: Border.all(
                   color: Colors.white,
                   width: 2.0,
@@ -93,9 +93,6 @@ class RegisterState extends State<Register> {
 
   @override
   Widget build(BuildContext context) {
-    double height = MediaQuery.of(context).size.height;
-    double width = MediaQuery.of(context).size.width;
-
     return loading
         ? Loading()
         : Scaffold(
@@ -103,8 +100,9 @@ class RegisterState extends State<Register> {
             body: Container(
                 padding: EdgeInsets.all(16.0),
                 child: Form(
-                    key: _formKey,
-                    child: Column(children: <Widget>[
+                  key: _formKey,
+                  child: Column(
+                    children: <Widget>[
                       SizedBox(height: 16),
                       Row(
                         children: <Widget>[
@@ -157,8 +155,9 @@ class RegisterState extends State<Register> {
                           validator: (value) =>
                               value.isEmpty ? "Enter a room number" : null),
                       SizedBox(height: 16),
-                      Row(children: <Widget>[
-                        InkResponse(
+                      Row(
+                        children: <Widget>[
+                          InkResponse(
                             onTap: () async {
                               if (_formKey.currentState.validate()) {
                                 setState(() => loading = true);
@@ -203,15 +202,19 @@ class RegisterState extends State<Register> {
                                       BorderRadius.all(Radius.circular(20)),
                                 ),
                                 child: Center(
-                                    child: Text("START",
-                                        style:
-                                            TextStyle())) // Find out how to make text be all caps
-                                )),
-                        FlatButton(
-                          child: Text("Sign in"),
-                          onPressed: widget.toggle,
-                        ),
-                      ]),
-                    ]))));
+                                  child: Text("START", style: TextStyle()),
+                                ) // Find out how to make text be all caps
+                                ),
+                          ),
+                          FlatButton(
+                            child: Text("Sign in"),
+                            onPressed: widget.toggle,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+          );
   }
 }

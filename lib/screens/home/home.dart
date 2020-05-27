@@ -1,13 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:laundryqueue/inherited_widgets/user_inherited_widget.dart';
-import 'package:laundryqueue/models/Queue.dart';
-import 'package:laundryqueue/models/QueueData.dart';
+import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
+import 'package:laundryqueue/models/QueueInstance.dart';
+import 'package:laundryqueue/data_handler_models/QueueData.dart';
 import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/screens/home/pages/queued.dart';
 import 'package:laundryqueue/screens/home/pages/start_queuing.dart';
 import 'package:laundryqueue/services/database.dart';
+import 'package:laundryqueue/services/shared_preferences.dart';
 import 'package:laundryqueue/streams/queue_stream.dart';
+import 'package:laundryqueue/widgets/loading.dart';
 
 class Home extends StatefulWidget {
   @override
@@ -15,9 +17,10 @@ class Home extends StatefulWidget {
 }
 
 class HomeState extends State<Home> {
+
   @override
   Widget build(BuildContext context) {
-    User user = UserInheritedWidget.of(context).user;
+    User user = DataInheritedWidget.of(context).user;
 
     return Scaffold(
       drawer: Drawer(
@@ -44,6 +47,8 @@ class HomeState extends State<Home> {
         ]),
       ),
       body: StreamBuilder(
+
+
           stream: QueueStream(
                   user: user,
                   queueDataStreams: DatabaseService(
@@ -65,13 +70,67 @@ class HomeState extends State<Home> {
 
               //Check if the user is queued for either drier or washer
               if (washerQueueData != null && drierQueueData != null) {
-                return QueuedList(
-                    washerQueueData: washerQueueData,
-                    drierQueueData: drierQueueData);
+
+                //Refresh data if not up to date
+                return FutureBuilder(
+                  future: DatabaseService(location: 'Block ${user.block}').refreshQueueLists(
+                      washerMachineNumber: washerQueueData.machineNumber,
+                    drierMachineNumber: drierQueueData.machineNumber
+                  ),
+                  builder: (context, snapshot) {
+
+                    if(!snapshot.hasData) {
+                      return Loading();
+                    }
+
+                    return DataInheritedWidget(
+                      queueDataList: queueListData,
+                      user: user,
+                      child: Queued(
+                          washerQueueData: washerQueueData,
+                          drierQueueData: drierQueueData),
+                    );
+                  },
+                );
               } else if (washerQueueData != null) {
-                return QueuedList(washerQueueData: washerQueueData);
+
+                //Refresh data if not up to date
+                return FutureBuilder(
+                  future: DatabaseService(location: 'Block ${user.block}').refreshQueueLists(
+                      washerMachineNumber: washerQueueData.machineNumber),
+                  builder: (context, snapshot) {
+
+                    if(!snapshot.hasData) {
+                      return Loading();
+                    }
+
+                    return DataInheritedWidget(
+                      queueDataList: queueListData,
+                      user: user,
+                      child: Queued(washerQueueData: washerQueueData),
+                    );
+                  },
+                );
               } else if (drierQueueData != null) {
-                return QueuedList(drierQueueData: drierQueueData);
+
+                //Refresh data if it is old
+                return FutureBuilder(
+                  future: DatabaseService(
+                    location: 'Block ${user.block}').refreshQueueLists(
+                      drierMachineNumber: drierQueueData.machineNumber
+                  ),
+                  builder: (context, snapshot) {
+                    if(snapshot.hasData) {
+                      return DataInheritedWidget(
+                        queueDataList: queueListData,
+                        user: user,
+                        child: Queued(drierQueueData: drierQueueData),
+                      );
+                    }
+
+                    return Loading();
+                  },
+                );
               }
 
               //Else, the user is not queued in anything
@@ -82,4 +141,5 @@ class HomeState extends State<Home> {
           }),
     );
   }
+
 }

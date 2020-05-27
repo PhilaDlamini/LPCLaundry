@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:laundryqueue/models/Queue.dart';
+import 'package:laundryqueue/models/QueueInstance.dart';
 
 class QueueProgressStream {
   final StreamController<double> _controller = StreamController<double>();
-  final Queue userQueue;
+  final QueueInstance userQueue;
   final String type;
 
   QueueProgressStream({this.userQueue, this.type}) {

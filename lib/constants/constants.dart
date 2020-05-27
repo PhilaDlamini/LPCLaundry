@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 const String CHANNEL_NAME = 'Channel name';
 const String CHANNEL_ID = 'Channel id';
 const String CHANNEL_DESCRIPTION = 'Channel description';
+const int WASHER_NOTIFY_ON_TURN_ID = 1234;
+const int DRIER_NOTIFY_ON_TURN_ID = 5678;
+const int WASHER_NOTIFY_WHEN_DONE_ID= 9101;
+const int DRIER_NOTIFY_WHEN_DONE_ID= 1213;
+const int START_TIME_ALARM_ID = 98242;
+const int SKIP_TIME_ALARM_ID = 10232;
+const int FINISH_QUEUE_ID = 49503;
 
 const InputDecoration inputTextDecoration = InputDecoration(
   filled: true,

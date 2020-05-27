@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:laundryqueue/models/Queue.dart';
+import 'package:laundryqueue/models/QueueInstance.dart';
 import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/services/database.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
@@ -24,7 +24,7 @@ class _QueuePageState extends State<QueuePage> {
   final List<String> drierMachines = ['1', '2'];
   final List<String> durations = [
     'Select duration',
-    '1 minutes',
+    '2 minutes',
     '15 minutes',
     '30 minutes',
     '45 minutes',
@@ -50,13 +50,6 @@ class _QueuePageState extends State<QueuePage> {
   void initState() {
     isWashing = widget.isWashing;
     isDrying = widget.isDrying;
-    _notificationPlugin.initialize(
-        InitializationSettings(
-            AndroidInitializationSettings('@mipmap/ic_launcher'),
-            IOSInitializationSettings()),
-        onSelectNotification: (String data) async {
-      await Navigator.pushNamed(context, '/home');
-    });
     super.initState();
   }
 
@@ -70,10 +63,10 @@ class _QueuePageState extends State<QueuePage> {
   }
 
   Future _updateStartTimes() async {
-    washerQueueTime = DateTime.fromMillisecondsSinceEpoch(
-        await DatabaseService().getQueueTime(
+    washerQueueTime = DateTime.fromMillisecondsSinceEpoch(await DatabaseService(
       location: 'Block ${user.block}',
       whichQueue: 'washer queue',
+    ).getQueueTime(
       machineNumber: washerQueuedFor,
     ));
 
@@ -82,11 +75,16 @@ class _QueuePageState extends State<QueuePage> {
             ? 0
             : int.parse(currentWasherDuration.split(' ')[0])));
 
-    drierQueueTime = DateTime.fromMillisecondsSinceEpoch(
-        await DatabaseService().getQueueTime(
+    int drierDurationInMillis = Duration(minutes: (currentDrierDuration == 'Select duration' ? 0 : int.parse(currentDrierDuration.split(' ')[0])))
+    .inMilliseconds;
+
+    drierQueueTime = DateTime.fromMillisecondsSinceEpoch(await DatabaseService(
       location: 'Block ${user.block}',
       whichQueue: 'drier queue',
+    ).getQueueTime(
       machineNumber: drierQueuedFor,
+      washerEndTime: isWashing ? washerEndTime.millisecondsSinceEpoch : DateTime.now().millisecondsSinceEpoch,
+      drierDurationInMillis: drierDurationInMillis,
     ));
 
     if (isWashing && isDrying) {
@@ -122,9 +120,9 @@ class _QueuePageState extends State<QueuePage> {
   Future _getRecommendMachines() async {
     if (firstTimeBuilding) {
       //Get the machines
-      Map<String, dynamic> recommendMachines = await DatabaseService(
+      Map<String, dynamic> recommendMachines = await DatabaseService(location: 'Block ${user.block}',
               availableWashers: washerMachines, availableDriers: drierMachines)
-          .getRecommendedMachines(location: 'Block ${user.block}');
+          .getRecommendedMachines();
 
       washerQueuedFor = recommendMachines['washer']['machine'];
       drierQueuedFor = recommendMachines['drier']['machine'];
@@ -147,65 +145,14 @@ class _QueuePageState extends State<QueuePage> {
     return 'Done';
   }
 
-  //Schedules a notification to display five minutes before the user's queue starts
-  void _scheduleNotifications(String machine, Queue queue) async {
-
-    //Only schedule notifications if the user opted to receive
-    bool notifyOnTurn = await Preferences.getBoolData(
-        Preferences.NOTIFY_ON_TURN);
-    bool notifyWhenDone = await Preferences.getBoolData(
-        Preferences.NOTIFY_WHEN_DONE);
-
-    print('$notifyOnTurn, $notifyWhenDone');
-
-    if (notifyOnTurn) {
-      DateTime fiveMinutesBeforeQueueStart = DateTime.fromMillisecondsSinceEpoch(queue.startTimeInMillis)
-          .subtract(Duration(minutes: 5));
-
-      //If it's passed already, show the notification now. Otherwise, schedule it
-      if (fiveMinutesBeforeQueueStart.isBefore(DateTime.now()) || fiveMinutesBeforeQueueStart.isAtSameMomentAs(DateTime.now())) {
-        _notificationPlugin.show(0, 'Your turn is close', 'Your turn to use the $machine starts at ${queue.displayableTime['startTime']}',
-            NotificationDetails(
-                AndroidNotificationDetails('chanel id', 'chanel name', 'channel description'),
-                IOSNotificationDetails()),
-            payload: 'Some data here');
-      } else {
-        _notificationPlugin.schedule(0, 'Your turn is close', 'Your turn to use the $machine starts at ${queue.displayableTime['startTime']}',
-            fiveMinutesBeforeQueueStart,
-            NotificationDetails(AndroidNotificationDetails(CHANNEL_ID, CHANNEL_NAME, CHANNEL_DESCRIPTION),
-                IOSNotificationDetails()),
-            payload: 'Some data here');
-      }
-    }
-
-    if (notifyWhenDone) {
-      //Also, schedule a notification for when the queue ends
-      String title = '${machine == 'drier'
-          ? 'Drying finished'
-          : 'Washing finished'}';
-      String body = '${machine == 'drier'
-          ? 'Your clothes were done drying at ${queue
-          .displayableTime['endTime']}'
-          : 'Your clothes were done washing at ${queue
-          .displayableTime['endTime']}'}';
-
-      DateTime queueEnd =
-      DateTime.fromMillisecondsSinceEpoch(queue.endTimeInMillis);
-      _notificationPlugin.schedule(0, title, body, queueEnd,
-          NotificationDetails(
-              AndroidNotificationDetails(CHANNEL_ID, CHANNEL_NAME, CHANNEL_DESCRIPTION),
-              IOSNotificationDetails()));
-    }
-  }
-
   void _queueUser() async {
     if (_formKey.currentState.validate()) {
       //Make sure queue times are up to date
       await _updateStartTimes();
 
       //Create the drier and washer instance queue instances
-      Queue washer = isWashing
-          ? Queue(
+      QueueInstance washer = isWashing
+          ? QueueInstance(
               which: washerQueuedFor.split(' ')[0],
               location: 'Block ${user.block}',
               timeQueuedInMillis: DateTime.now().millisecondsSinceEpoch,
@@ -215,8 +162,8 @@ class _QueuePageState extends State<QueuePage> {
             )
           : null;
 
-      Queue drier = isDrying
-          ? Queue(
+      QueueInstance drier = isDrying
+          ? QueueInstance(
               which: drierQueuedFor.split(' ')[0],
               location: 'Block ${user.block}',
               user: user,
@@ -226,18 +173,12 @@ class _QueuePageState extends State<QueuePage> {
           : null;
 
       if (isWashing && isDrying) {
-        //Schedules the notifications and save data
-        _scheduleNotifications('drier', drier);
-        _scheduleNotifications('washer', washer);
-
-        await DatabaseService().queue(washer, whichQueue: 'washer queue');
-        await DatabaseService().queue(drier, whichQueue: 'drier queue');
+        await DatabaseService(whichQueue: 'washer queue').queue(washer);
+        await DatabaseService(whichQueue: 'drier queue').queue(drier);
       } else if (isWashing) {
-        _scheduleNotifications('washer', washer);
-        await DatabaseService().queue(washer, whichQueue: 'washer queue');
+        await DatabaseService(whichQueue: 'washer queue').queue(washer);
       } else {
-        _scheduleNotifications('drier', drier);
-        await DatabaseService().queue(drier, whichQueue: 'drier queue');
+        await DatabaseService(whichQueue: 'drier queue').queue(drier);
       }
 
       Navigator.pop(context); //We do need this??
@@ -289,7 +230,7 @@ class _QueuePageState extends State<QueuePage> {
                 decoration: inputTextDecoration,
                 //Change this later
                 validator: (val) => (isDrying &&
-                        currentDrierDuration == 'Select valid duration')
+                        currentDrierDuration == 'Select duration')
                     ? 'Select duration'
                     : null,
                 items: durations.map((item) {
@@ -356,7 +297,7 @@ class _QueuePageState extends State<QueuePage> {
                 decoration: inputTextDecoration,
                 //Change this later
                 validator: (val) => (isWashing &&
-                        currentWasherDuration == 'Select valid duration')
+                        currentWasherDuration == 'Select duration')
                     ? 'Select duration'
                     : null,
                 items: durations.map((item) {

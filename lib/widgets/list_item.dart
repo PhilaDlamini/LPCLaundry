@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:laundryqueue/models/Queue.dart';
+import 'package:laundryqueue/models/QueueInstance.dart';
 
 class ListItem extends StatelessWidget{
 
-  final Queue queue;
+  final QueueInstance queue;
   final bool me;
 
   ListItem({this.queue, this.me});

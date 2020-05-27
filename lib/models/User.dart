@@ -1,10 +1,10 @@
-import 'package:meta/meta.dart';
+import 'package:equatable/equatable.dart';
 
-class User {
-  String name;
-  String block;
-  String room;
-  String uid;
+class User extends Equatable{
+  final String name;
+  final String block;
+  final String room;
+  final String uid;
 
   User({this.name, this.uid, this.block, this.room});
 
@@ -29,5 +29,8 @@ class User {
   String toString() {
     return 'Name: $name Block: $block Room: $room Uid: $uid';
   }
+
+  @override
+  List<Object> get props => [name, block, room, uid];
 
 }
