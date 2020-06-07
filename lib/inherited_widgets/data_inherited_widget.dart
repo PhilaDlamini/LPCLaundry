@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:laundryqueue/data_handler_models/QueueData.dart';
+import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/models/User.dart';
 
 class DataInheritedWidget extends InheritedWidget {

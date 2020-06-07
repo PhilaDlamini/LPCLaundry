@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
-import 'package:laundryqueue/data_handler_models/QueueData.dart';
+import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/models/User.dart';
+import 'package:laundryqueue/screens/drawer_pages/profile.dart';
 import 'package:laundryqueue/screens/home/pages/queued.dart';
 import 'package:laundryqueue/screens/home/pages/start_queuing.dart';
 import 'package:laundryqueue/services/database.dart';
@@ -31,6 +34,20 @@ class HomeState extends State<Home> {
             ),
           ),
           ListTile(
+            leading: Icon(Icons.person_outline),
+            title: Text('Account'),
+            onTap: () {
+              Navigator.push(context,
+              MaterialPageRoute(
+                builder: (context) => Profile(user: user)
+              ));
+            },
+          ),
+          Container(
+            color: Colors.blueGrey,
+            height: 1,
+          ),
+          ListTile(
             leading: Icon(Icons.settings),
             title: Text('Setting'),
             onTap: () {
@@ -47,9 +64,8 @@ class HomeState extends State<Home> {
         ]),
       ),
       body: StreamBuilder(
-
-
           stream: QueueStream(
+                  context,
                   user: user,
                   queueDataStreams: DatabaseService(
                       user: user,
@@ -134,7 +150,7 @@ class HomeState extends State<Home> {
               }
 
               //Else, the user is not queued in anything
-              return StartQueuing();
+              return StartQueuing(user: user);
             }
 
             return Container();

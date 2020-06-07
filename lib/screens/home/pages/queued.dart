@@ -3,12 +3,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
-import 'package:laundryqueue/data_handler_models/QueueData.dart';
+import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/screens/home/pages/queue_in_progress.dart';
-import 'package:laundryqueue/services/database.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
-import 'package:laundryqueue/widgets/queued_list_base.dart';
+import 'package:laundryqueue/screens/home/pages/queued_list_base.dart';
 
 class Queued extends StatefulWidget {
   final QueueData washerQueueData;
@@ -21,13 +20,14 @@ class Queued extends StatefulWidget {
 }
 
 class _QueuedState extends State<Queued> {
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-  int _currentPage = 0;
+
   User user;
   Widget washerPage;
   Widget drierPage;
   QueueInstance userDrierQueueInstance;
   QueueInstance userWasherQueueInstance;
+  QueueData washerQueueData;
+  QueueData drierQueueData;
   bool hasWasherQueueData;
   bool hasDrierQueueData;
 
@@ -42,17 +42,21 @@ class _QueuedState extends State<Queued> {
   }
 
   Future _initialize() async {
-    hasWasherQueueData = widget.washerQueueData != null;
-    hasDrierQueueData = widget.drierQueueData != null;
+    hasWasherQueueData = washerQueueData != null;
+    hasDrierQueueData = drierQueueData != null;
 
     userWasherQueueInstance = (hasWasherQueueData)
-        ? widget.washerQueueData.queueInstances
-            .singleWhere((queue) => queue.user.uid == user.uid)
+        ? washerQueueData.queuedUnderOtherUser
+            ? washerQueueData.queueInstanceUnder
+            : washerQueueData.queueInstances
+                .singleWhere((queue) => queue.user.uid == user.uid)
         : null;
 
     userDrierQueueInstance = (hasDrierQueueData)
-        ? widget.drierQueueData.queueInstances
-            .singleWhere((queue) => queue.user.uid == user.uid)
+        ? drierQueueData.queuedUnderOtherUser
+            ? drierQueueData.queueInstanceUnder
+            : drierQueueData.queueInstances
+                .singleWhere((queue) => queue.user.uid == user.uid)
         : null;
 
     //Initialize the pages
@@ -61,7 +65,9 @@ class _QueuedState extends State<Queued> {
             userQueueInstance: userWasherQueueInstance,
             title: 'Washing in progress',
             whichQueue: 'washer queue',
+            enableQueuing: !hasDrierQueueData,
             machineNumber: widget.washerQueueData.machineNumber,
+            queueUnderOtherUser: washerQueueData.queuedUnderOtherUser,
           )
         : hasWasherQueueData
             ? QueueListBase(
@@ -80,7 +86,9 @@ class _QueuedState extends State<Queued> {
             userQueueInstance: userDrierQueueInstance,
             title: 'Drying in progress',
             whichQueue: 'drier queue',
+            enableQueuing: false,
             machineNumber: widget.drierQueueData.machineNumber,
+            queueUnderOtherUser: drierQueueData.queuedUnderOtherUser,
           )
         : hasDrierQueueData
             ? QueueListBase(
@@ -88,112 +96,16 @@ class _QueuedState extends State<Queued> {
                 usersInQueue: widget.drierQueueData.queueInstances,
                 userQueueInstance: userDrierQueueInstance,
                 machineNumber: widget.drierQueueData.machineNumber,
-                enableQueuing: !hasDrierQueueData,
+                enableQueuing: false,
+                //Once the user has queued for the drier, they can't then queue for the washer (order conflict)
                 machineType: widget.drierQueueData.whichMachine,
                 toggle: _toggle,
               )
             : null;
 
-    _scheduleNotifications();
-
     return 'Done';
   }
 
-  /*
-    If the user queues for only the washer/drier individually, the notification isn't deleted as when data changes we don't come here
-    If they queue for both the washer and drier, when washer finishes the notification is deleted and only the drier one will remain
-  * */
-  void _scheduleNotifications() async {
-    bool isNotifyingOnTurn =
-        await Preferences.getBoolData(Preferences.NOTIFY_ON_TURN);
-    bool isNotifyingWhenDone =
-        await Preferences.getBoolData(Preferences.NOTIFY_WHEN_DONE);
-
-    //First, remove any notifications that might have been scheduled before for this user
-    if (isNotifyingOnTurn) {
-      await _notificationsPlugin.cancel(WASHER_NOTIFY_ON_TURN_ID);
-      await _notificationsPlugin.cancel(DRIER_NOTIFY_ON_TURN_ID);
-    }
-
-    if (isNotifyingWhenDone) {
-      await _notificationsPlugin.cancel(WASHER_NOTIFY_WHEN_DONE_ID);
-      await _notificationsPlugin.cancel(DRIER_NOTIFY_WHEN_DONE_ID);
-    }
-
-    //Schedule the new notifications
-    NotificationDetails notificationDetails = NotificationDetails(
-        AndroidNotificationDetails(
-            CHANNEL_ID, CHANNEL_NAME, CHANNEL_DESCRIPTION,
-            styleInformation: BigTextStyleInformation('')),
-        IOSNotificationDetails());
-
-    if (hasWasherQueueData) {
-      if (isNotifyingOnTurn) {
-        DateTime fiveMinutesEarlier = DateTime.fromMillisecondsSinceEpoch(
-                userWasherQueueInstance.startTimeInMillis)
-            .subtract(Duration(minutes: 5));
-        if (fiveMinutesEarlier.isBefore(DateTime.now()) ||
-            fiveMinutesEarlier.isAtSameMomentAs(DateTime.now())) {
-          _notificationsPlugin.show(
-              WASHER_NOTIFY_ON_TURN_ID,
-              'Your turn is close',
-              'Your turn to use the washing machine starts at ${userWasherQueueInstance.displayableTime['startTime']}',
-              notificationDetails);
-        } else {
-          _notificationsPlugin.schedule(
-              WASHER_NOTIFY_ON_TURN_ID,
-              'Your turn is close',
-              'Your turn to use the washing machine starts at ${userWasherQueueInstance.displayableTime['startTime']}',
-              fiveMinutesEarlier,
-              notificationDetails);
-        }
-      }
-
-      if (isNotifyingWhenDone) {
-        _notificationsPlugin.schedule(
-            WASHER_NOTIFY_WHEN_DONE_ID,
-            'You clothes are done washing',
-            'Your clothes finished washing at ${userWasherQueueInstance.displayableTime['endTime']}',
-            DateTime.fromMillisecondsSinceEpoch(
-                userWasherQueueInstance.endTimeInMillis),
-            notificationDetails);
-      }
-    }
-
-    //Repeat the same for the drier data
-    if (hasDrierQueueData) {
-      if (isNotifyingOnTurn) {
-        DateTime fiveMinutesEarlier = DateTime.fromMillisecondsSinceEpoch(
-                userDrierQueueInstance.startTimeInMillis)
-            .subtract(Duration(minutes: 5));
-        if (fiveMinutesEarlier.isBefore(DateTime.now()) ||
-            fiveMinutesEarlier.isAtSameMomentAs(DateTime.now())) {
-          _notificationsPlugin.show(
-              DRIER_NOTIFY_ON_TURN_ID,
-              'Your turn is close',
-              'Your turn to use the drier starts at ${userDrierQueueInstance.displayableTime['startTime']}',
-              notificationDetails);
-        } else {
-          _notificationsPlugin.schedule(
-              DRIER_NOTIFY_ON_TURN_ID,
-              'Your turn is close',
-              'Your turn to use the drier starts at ${userDrierQueueInstance.displayableTime['starTime']}',
-              fiveMinutesEarlier,
-              notificationDetails);
-        }
-      }
-
-      if (isNotifyingWhenDone) {
-        _notificationsPlugin.schedule(
-            DRIER_NOTIFY_WHEN_DONE_ID,
-            'You clothes are done drying',
-            'Your clothes finished drying at ${userDrierQueueInstance.displayableTime['endTime']}',
-            DateTime.fromMillisecondsSinceEpoch(
-                userDrierQueueInstance.endTimeInMillis),
-            notificationDetails);
-      }
-    }
-  }
 
   void _toggle() {
     setState(() {}); //Redraws
@@ -201,14 +113,20 @@ class _QueuedState extends State<Queued> {
 
   @override
   void initState() {
-    _notificationsPlugin.initialize(
-        InitializationSettings(
-            AndroidInitializationSettings('@mipmap/ic_launcher'),
-            IOSInitializationSettings()),
-        onSelectNotification: (payload) async {
-      await Navigator.pushNamed(context, '/home');
-    });
+    washerQueueData = widget.washerQueueData;
+    drierQueueData = widget.drierQueueData;
     super.initState();
+  }
+
+  @override
+  void didUpdateWidget(Queued oldWidget) {
+    if(washerQueueData != oldWidget.washerQueueData || drierQueueData != oldWidget.drierQueueData) {
+      setState(() {
+        washerQueueData = widget.washerQueueData;
+        drierQueueData = widget.drierQueueData;
+      });
+    }
+    super.didUpdateWidget(oldWidget);
   }
 
   @override
@@ -224,22 +142,25 @@ class _QueuedState extends State<Queued> {
 
         //We display whatever list is not null
         if (washerPage != null && drierPage != null) {
-          return Scaffold(
-            body: IndexedStack(
-              index: _currentPage,
-              children: <Widget>[washerPage, drierPage],
-            ),
-            bottomNavigationBar: BottomNavigationBar(
-              items: [
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.wb_iridescent), title: Text('Washer')),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.wb_sunny), title: Text('Drier')),
-              ],
-              currentIndex: _currentPage,
-              onTap: (index) {
-                setState(() => _currentPage = index);
-              },
+          return DefaultTabController(
+            length: 2,
+            child: Scaffold(
+              appBar: AppBar(
+                leading: GestureDetector(child: Icon(Icons.menu)),
+                actions: <Widget>[
+                  GestureDetector(child: Icon(Icons.more_vert))
+                ],
+                title: Text('Laundry'),
+                bottom: TabBar(
+                  tabs: <Widget>[
+                    Tab(text: 'Washer'),
+                    Tab(text: 'Drier'),
+                  ],
+                ),
+              ),
+              body: TabBarView(
+                children: <Widget>[washerPage, drierPage],
+              ),
             ),
           );
         } else if (drierPage != null) {

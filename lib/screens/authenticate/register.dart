@@ -2,18 +2,17 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
 import 'package:laundryqueue/widgets/loading.dart';
-/*
-import 'package:image_picker_modern/image_picker_modern.dart';
-*/
 
 class Register extends StatefulWidget {
   final Function toggle;
+  final Function toggleWrapper;
 
-  Register({this.toggle});
+  Register({this.toggle, this.toggleWrapper});
 
   @override
   State<StatefulWidget> createState() => RegisterState();
@@ -25,19 +24,17 @@ class RegisterState extends State<Register> {
   String lpcEmail;
   String room;
   String password;
-  File _image;
+  File _file;
 
   AuthService _auth = AuthService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool loading = false;
 
-  Future getImage() async {
-    print("About to select images");
-
-    /*var image = await ImagePicker.pickImage(source: ImageSource.gallery);
+  Future _pickImage() async {
+    var imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
     setState(() {
-      _image = image;
-    });*/
+      _file = imageFile;
+    });
   }
 
   Widget getImageSelector() {
@@ -50,16 +47,15 @@ class RegisterState extends State<Register> {
             height: 80,
             decoration: BoxDecoration(
                 shape: BoxShape.circle,
-//                image: DecorationImage(
-//                  image: _image == null
-//                      ? NetworkImage('ljfwoi')
-//                      : Image.file(_image),
-//                  fit: BoxFit.fill,
-//                ),
-                border: Border.all(
-                  color: Colors.white,
-                  width: 2.0,
-                )),
+                border: Border.all(color: Colors.white, width: 1.0)),
+            child: _file != null
+                ? Image.file(
+                  _file,
+                  fit: BoxFit.fill,
+                )
+                : CircleAvatar(
+                    backgroundColor: Colors.blueGrey,
+                  ),
           ),
           Container(
             // Is it only restricted to the height + width of the container
@@ -68,7 +64,7 @@ class RegisterState extends State<Register> {
             child: Align(
               alignment: Alignment.bottomRight,
               child: InkResponse(
-                onTap: getImage,
+                onTap: _pickImage,
                 child: Container(
                   width: 40,
                   height: 40,
@@ -124,7 +120,7 @@ class RegisterState extends State<Register> {
                       SizedBox(height: 16),
                       TextFormField(
                           onChanged: (newString) => lpcEmail = newString.trim(),
-                          decoration: inputTextDecoration.copyWith(
+                          decoration: createAccountInputDecoration.copyWith(
                               hintText: "Email address",
                               icon: Icon(Icons.email)),
                           validator: (value) => value.isEmpty
@@ -134,7 +130,7 @@ class RegisterState extends State<Register> {
                       TextFormField(
                         obscureText: true,
                         onChanged: (newString) => password = newString.trim(),
-                        decoration: inputTextDecoration.copyWith(
+                        decoration: createAccountInputDecoration.copyWith(
                             hintText: "Password", icon: Icon(Icons.security)),
                         validator: (value) =>
                             value.isEmpty ? "Enter a valid password" : null,
@@ -142,7 +138,7 @@ class RegisterState extends State<Register> {
                       SizedBox(height: 16),
                       TextFormField(
                         onChanged: (newString) => block = newString.trim(),
-                        decoration: inputTextDecoration.copyWith(
+                        decoration: createAccountInputDecoration.copyWith(
                             hintText: "Block", icon: Icon(Icons.business)),
                         validator: (value) =>
                             value.isEmpty ? "Entere a block number" : null,
@@ -150,7 +146,7 @@ class RegisterState extends State<Register> {
                       SizedBox(height: 16),
                       TextFormField(
                           onChanged: (newString) => room = newString.trim(),
-                          decoration: inputTextDecoration.copyWith(
+                          decoration: createAccountInputDecoration.copyWith(
                               hintText: "Room", icon: Icon(Icons.hotel)),
                           validator: (value) =>
                               value.isEmpty ? "Enter a room number" : null),
@@ -160,36 +156,45 @@ class RegisterState extends State<Register> {
                           InkResponse(
                             onTap: () async {
                               if (_formKey.currentState.validate()) {
-                                setState(() => loading = true);
-                                dynamic result =
-                                    await _auth.registerWithEmailAndPassword(
-                                        block: block,
-                                        name: name,
-                                        room: room,
-                                        email: lpcEmail,
-                                        password: password);
+                                if (_file != null) {
+                                  setState(() => loading = true);
 
-                                if (result is PlatformException) {
-                                  setState(() => loading = false);
-                                  Scaffold.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: Duration(seconds: 3),
-                                      content: Text("Error: ${result.message}"),
-                                    ),
-                                  );
-                                } else if (result == null) {
-                                  setState(() => loading = false);
-                                  Scaffold.of(context).showSnackBar(
-                                    SnackBar(
-                                      duration: Duration(seconds: 3),
-                                      content: Text(
-                                          "Unknown error signing up. Please try again"),
-                                    ),
-                                  );
+                                  dynamic result =
+                                      await _auth.registerWithEmailAndPassword(
+                                          block: block,
+                                          name: name,
+                                          room: room,
+                                          email: lpcEmail,
+                                          file: _file,
+                                          password: password);
+
+                                  if (result is PlatformException) {
+                                    setState(() => loading = false);
+                                    Scaffold.of(context).showSnackBar(
+                                      SnackBar(
+                                        duration: Duration(seconds: 3),
+                                        content:
+                                            Text("Error: ${result.message}"),
+                                      ),
+                                    );
+                                  } else if (result == null) {
+                                    setState(() => loading = false);
+                                    Scaffold.of(context).showSnackBar(
+                                      SnackBar(
+                                        duration: Duration(seconds: 3),
+                                        content: Text(
+                                            "Unknown error signing up. Please try again"),
+                                      ),
+                                    );
+                                  }
+
+                                  //Set up default SharedPreferences values
+                                  await Preferences.setDefaultPreferences();
+                                  widget.toggleWrapper();
+                                } else {
+                                  Scaffold.of(context).showSnackBar(SnackBar(
+                                      content: Text('Select an image')));
                                 }
-
-                                //Initialize preferences (sets up default values)
-                                await Preferences.initializePreferences();
                               }
                             },
                             child: Container(

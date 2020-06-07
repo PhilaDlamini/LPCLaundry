@@ -20,6 +20,10 @@ class Wrapper extends StatefulWidget {
 
 class WrapperState extends State<Wrapper> {
 
+  void _toggle() {
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
 
@@ -41,7 +45,7 @@ class WrapperState extends State<Wrapper> {
         },
       );
     } else {
-      return Authenticate();
+      return Authenticate(toggleWrapper: _toggle,);
     }
   }
 }

@@ -1,14 +1,15 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:laundryqueue/data_handler_models/QueueData.dart';
+import 'package:laundryqueue/constants/constants.dart';
+import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
 import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
 
 class DatabaseService {
   static final Firestore _fireStore = Firestore.instance;
-  final CollectionReference _users = _fireStore.collection('users');
+  final CollectionReference _users = _fireStore.collection('all users');
   final List<String> availableWashers;
   final List<String> availableDriers;
   final User user;
@@ -28,14 +29,37 @@ class DatabaseService {
   Stream<QuerySnapshot> get usersStream => _users.snapshots();
 
   //Updates user information in the database
-  Future<dynamic> updateUserInfo(Map<String, String> data) async {
-    return await _users.document(uid).setData(data);
-  }
+  Future<dynamic> setUserInfo() async => await _users.document(user.uid).setData(user.toMap());
+
+  //Updates the user information
+  Future updateUserInfo(Map<String, dynamic> data, {User passedUser}) async => await _users.document(passedUser != null ?
+   passedUser.uid : user.uid).updateData(data);
+
+  //Removes the user information from the database
+  Future removeUserInfo() async => await _users.document(user.uid).delete();
 
   // Gets the user data for this uid
   Future<User> getUser() async {
     DocumentSnapshot snapshot = await _users.document(uid).get();
     return User.fromMap(snapshot.data);
+  }
+
+  //Returns the a list of the users in the same block as this one
+  Future getUsersInBlock() async{
+
+    //Holds the list of users
+    List<User> users = List<User>();
+
+    //Get the documents and loop through them
+    QuerySnapshot querySnapshots = await _fireStore.collection('all users').getDocuments();
+
+    for(DocumentSnapshot snapshot in querySnapshots.documents) {
+      User currentUser = User.fromMap(snapshot.data);
+      if(currentUser != user && currentUser.block == user.block && !currentUser.currentlyQueued) {
+        users.add(currentUser);
+      }
+    }
+    return users.isEmpty ? 'No other users in Block ${user.block}' : users;
   }
 
   //Queues the user for the specified machine at the specified location
@@ -66,7 +90,7 @@ class DatabaseService {
   }
 
   //Un-queues the user when they are done using the machine
-  Future finishQueue({QueueInstance queue}) async {
+  Future finishQueue({QueueInstance queue, List<QueueData> queueDataList}) async {
     //Get the data from the queue
     DocumentReference reference = _fireStore
         .collection(whichQueue)
@@ -77,12 +101,30 @@ class DatabaseService {
 
     //Remove the user from the list
     List<dynamic> usersQueued = snapshot.data['queue'];
-    usersQueued.removeWhere((item) => item['user']['uid'].trim() == queue.user.uid);
+    Map<String, dynamic> userQueueInstance = usersQueued.singleWhere((item) => item['user']['uid'].trim() == queue.user.uid);
+    usersQueued.remove(userQueueInstance);
 
     //Save the queue data to preferences (for the summary later)
     String key = whichQueue == 'washer queue' ? Preferences.LAST_WASHER_USED_DATA : Preferences.LAST_DRIER_USED_DATA;
     String jsonData = json.encode(queue.toSummaryMap(machineNumber));
     await Preferences.updateStringData(key, jsonData);
+
+    //If this is the washer queue, check to see if the user also queued for the drier. If not, reset queue status. Else, wait
+    List<String> uIDs = queue.usersQueuedWith;
+    uIDs.add(queue.user.uid);
+
+    if(whichQueue == 'washer queue') {
+      for(String uid in uIDs) {
+        bool queuedInDrier = _isAlsoQueuedInDrier(uid, queueDataList);
+        if(!queuedInDrier) {
+          await updateUserInfo({'currentlyQueued' : false}, passedUser: User(uid: uid));
+        }
+      }
+    } else {
+      for(String uid in uIDs) {
+       await updateUserInfo({'currentlyQueued' : false}, passedUser: User(uid: uid));
+      }
+    }
 
     //Re-save the data
     await reference.setData({
@@ -157,10 +199,6 @@ class DatabaseService {
   ///Takes in a map in the form key: machine number, value: lowest index, as well the duration to extend things by
   void _updateDrierTimes(Map<String, int> data, int timeExtensionInMillis, List<QueueData> queueListData) async {
 
-    print('The data about driers to update as given in the map $data');
-    Duration duration = Duration(milliseconds: timeExtensionInMillis);
-    print('The duration extending by: ${duration.inMinutes}');
-
     //Loop through all the information in the map and update times
     for(String machineNumber in data.keys) {
 
@@ -186,10 +224,7 @@ class DatabaseService {
         instance['startTime'] += timeExtensionInMillis;
         instance['endTime'] += timeExtensionInMillis;
         updatedInstances.add(instance);
-        print(instance);
       }
-
-      print(updatedInstances);
 
      await _fireStore.collection('drier queue').document(location)
           .collection(machineNumber).document('queued list').setData({
@@ -227,32 +262,32 @@ class DatabaseService {
 
     } else {
 
-
-      //Skip the user in the drier queue too since they are skipped in the washer queue
-      await _reQueueDrier(QueueInstance.fromMap(updatedQueues.last), queueDataList, washerQueueList: updatedQueues);
-
-
       //First, save the new data with the user skipped (comes before the above)
       await reference.setData({'queue': updatedQueues});
+
+      //Skip the user in the drier queue too since they are skipped in the washer queue
+      await _reQueueDrier(QueueInstance.fromMap(updatedQueues.last), queueDataList);
     }
 
     return 'Done';
   }
 
   //Skips a user in the drier queue who has been skipped in the washer queue
-  Future _reQueueDrier(QueueInstance userWasherQueueInstance, List<QueueData> queueDataList, {List<dynamic> washerQueueList}) async {
+  Future _reQueueDrier(QueueInstance userWasherQueueInstance, List<QueueData> queueDataList) async {
 
     //Holds the new list to save
     List<dynamic> updatedList = List<dynamic>();
 
     //Read the sta and see if the user is queued
     DocumentReference _reference = _fireStore.collection('drier queue').document(location).collection(machineNumber).document('queued list');
-    List<dynamic> queueInstances = (await _reference.get()).data['queue'];
+    DocumentSnapshot snapshot = await _reference.get();
+
+    if(snapshot.data != null) {
+    List<dynamic> queueInstances = snapshot.data['queue'];
     var userQueue = queueInstances.singleWhere((instance) => instance['user']['uid'] == userWasherQueueInstance.user.uid, orElse: () => null);
 
     //If the user is queued here, re-queue them in the drier
     if (userQueue != null) {
-
       //Get the index and save all the queues before this one
       int userIndex = queueInstances.indexOf(userQueue);
 
@@ -260,19 +295,22 @@ class DatabaseService {
       updatedList.addAll(queueInstances.getRange(0, userIndex));
 
       //For rest, start and end times need to be updated
-      List<dynamic> instancesToUpdate = queueInstances.getRange(userIndex + 1, queueInstances.length).toList();
+      List<dynamic> instancesToUpdate = queueInstances.getRange(
+          userIndex + 1, queueInstances.length).toList();
       instancesToUpdate.add(userQueue);
       int lastTimeAvailable;
 
-      if(userIndex == 0 && queueInstances.length == 1) {
+      if (userIndex == 0 && queueInstances.length == 1) {
         lastTimeAvailable = userWasherQueueInstance.endTimeInMillis;
       } else if (userIndex == 0) {
-        lastTimeAvailable = DateTime.now().millisecondsSinceEpoch;
+        lastTimeAvailable = DateTime
+            .now()
+            .millisecondsSinceEpoch;
       } else {
         lastTimeAvailable = queueInstances[userIndex - 1]['endTime'];
       }
 
-      for(var queue in instancesToUpdate) {
+      for (var queue in instancesToUpdate) {
         //Get the start time and duration
         int duration = queue['endTime'] - queue['startTime'];
         int startTime = await getQueueTime(availableFrom: lastTimeAvailable);
@@ -285,14 +323,18 @@ class DatabaseService {
         lastTimeAvailable = queue['endTime'];
 
         //if this one is the re-queued userQueue, double check that the start time is after washer end time
-        if(queue == userQueue) {
-          DateTime washerEndTime = DateTime.fromMillisecondsSinceEpoch(userWasherQueueInstance.endTimeInMillis);
-          DateTime drierStartTime = DateTime.fromMillisecondsSinceEpoch(queue['startTime']);
-          if(washerEndTime.isAfter(drierStartTime)
+        if (queue == userQueue) {
+          DateTime washerEndTime = DateTime.fromMillisecondsSinceEpoch(
+              userWasherQueueInstance.endTimeInMillis);
+          DateTime drierStartTime = DateTime.fromMillisecondsSinceEpoch(
+              queue['startTime']);
+          if (washerEndTime.isAfter(drierStartTime)
               || washerEndTime.isAtSameMomentAs(drierStartTime)
-              || drierStartTime.difference(washerEndTime).inMinutes < 5) {
-
-            int startTime = await getQueueTime(availableFrom: userWasherQueueInstance.endTimeInMillis);
+              || drierStartTime
+                  .difference(washerEndTime)
+                  .inMinutes < 5) {
+            int startTime = await getQueueTime(
+                availableFrom: userWasherQueueInstance.endTimeInMillis);
             queue['startTime'] = startTime;
             queue['endTime'] = startTime + duration;
           }
@@ -303,14 +345,13 @@ class DatabaseService {
       }
 
       //Ensure that for other users, queue times match
-      //updatedList = await _ensureCorrectTimes(updatedList, queueDataList, washerList: washerQueueList);
-
-      print('Drier should be requeued');
+      updatedList = await _ensureCorrectTimes(updatedList, queueDataList);
 
       //Save all this data again
       await _reference.setData({
-        'queue' : updatedList
+        'queue': updatedList
       });
+    }
 
     }
 
@@ -346,8 +387,22 @@ class DatabaseService {
     List<dynamic> updatedInstances = await _getUpdatedList(lastTimeAvailable: lastTimeAvailable, listToUpdate: instancesToUpdate);
     updatedQueues.addAll(updatedInstances);
 
-    //If this is the drier queue, check if the user's new queue time isn't before they are done washing
-    if(whichQueue == 'drier queue') {
+    List<String> uIDs = queue.usersQueuedWith;
+    uIDs.add(queue.user.uid);
+
+    if(whichQueue == 'washer queue') {
+      for(String uid in uIDs) {
+        bool queuedInDrier = _isAlsoQueuedInDrier(uid, queueDataList);
+        if(!queuedInDrier) {
+          await updateUserInfo({'currentlyQueued' : false}, passedUser: User(uid: uid));
+        }
+      }
+    } else {
+      for(String uid in uIDs) {
+        await updateUserInfo({'currentlyQueued' : false}, passedUser: User(uid: uid));
+      }
+
+      //If this is the drier queue, check if the user's new queue time isn't before they are done washing
       updatedQueues = await _ensureCorrectTimes(updatedQueues, queueDataList);
     }
 
@@ -360,76 +415,101 @@ class DatabaseService {
   }
 
   //Returns a list (to save in the drier) that ensures there is no conflict in queue times
-  Future<List<dynamic>> _ensureCorrectTimes(List<dynamic> suggestedDrierQueueList, List<QueueData> queueDataList, {List<dynamic> washerList}) async {
+  Future<List<dynamic>> _ensureCorrectTimes(List<dynamic> suggestedDrierQueueList, List<QueueData> queueDataList) async {
 
-    //Holds the currently updated list
+    //Holds the original queueDataList before it is modified
+    List<QueueData> originalQueueDataList = List<QueueData>();
+    originalQueueDataList.addAll(queueDataList);
+
+    //Holds the currently updated drier list (to start, it's set to the suggestedDrierQueueList)
     List<dynamic> currentlyUpdatedList = suggestedDrierQueueList;
 
-    //Get the washer queue data
-    List<dynamic> washerQueueList;
-    if(washerList != null) {
-      washerQueueList = washerList;
-    } else {
-      washerQueueList = (await _fireStore.collection('washer queue')
-          .document(location).collection(machineNumber).document('queued list').get())['queue']; //The current machineNumber
-    }
+    //Remove all the drier information to get only the washers
+    queueDataList.removeWhere((queueData) => queueData.whichMachine == 'drier');
 
-    for(Map<String, dynamic> queue in washerQueueList) {
+    //Loop through all the washing machines and check if users queued there are also queued here
+    for(int i = 0; i < queueDataList.length; i++) {
+      QueueData queueData = queueDataList[i]; //Get the current
+      for(int i = 0; i < queueData.queueInstances.length; i++) {
+        QueueInstance queueInstance = queueData.queueInstances[i];
 
-      //If the user is queued in both, ensure correct queue times
-      Map<String, dynamic> data = _isQueuedInBothWasherAndDrier(queue, queueDataList);
-      bool isQueuedInBoth = data['queuedInBoth'];
+        //Check if this user is queued in this drier
+        Map<String, dynamic> isQueuedData = _isQueuedInBothWasherAndDrier(queueInstance.toQueuingMap(),
+            originalQueueDataList, specifiedDrierNumber: machineNumber);
 
-      if(isQueuedInBoth) {
+        if(isQueuedData['queuedInBoth']) {
 
-        //Holds the queue list with the correct times for this queue instance
-        List<dynamic> correctedForCurrentQueueInstance = List<dynamic>();
+          //Holds the corrected drier queue list for this current washer instance
+          List<dynamic> correctedForCurrentQueueInstance = List<dynamic>();
 
-        //Get the drier instance
-        Map<String, dynamic> userDrierInstance = data['drierInstance'];
+          //Get the drier instance for this queue
+          Map<String, dynamic> userDrierInstance = currentlyUpdatedList.singleWhere((instance) =>
+          instance['user']['uid'] == queueInstance.user.uid, orElse: () => null);
 
-        //If queue times do not match, fix this
-        DateTime washerEndTime = DateTime.fromMillisecondsSinceEpoch(queue['endTime']);
-        DateTime drierStartTime = DateTime.fromMillisecondsSinceEpoch(userDrierInstance['startTime']);
+          //Make sure queue times match. If not update them
+          DateTime washerEndTime = DateTime.fromMillisecondsSinceEpoch(queueInstance.endTimeInMillis);
+          DateTime drierStartTime = DateTime.fromMillisecondsSinceEpoch(userDrierInstance['startTime']);
 
-        if(drierStartTime.isBefore(washerEndTime)
-            || drierStartTime.isAtSameMomentAs(washerEndTime)
-            || drierStartTime.difference(washerEndTime).inMinutes < 5) {
+          //Update times if they do not 'match'
+          if(drierStartTime.isBefore(washerEndTime)
+              || drierStartTime.isAtSameMomentAs(washerEndTime)
+              || drierStartTime.difference(washerEndTime).inMinutes < 5) {
 
-          //Re update drier start times starting with at this user
-          int userIndex = currentlyUpdatedList.indexOf(userDrierInstance);
+            //Re update drier start times starting with at this user
+            int userIndex = currentlyUpdatedList.indexOf(userDrierInstance);
 
-          //Add the the ones before this user to the updated list as they don't need to be updated
-          correctedForCurrentQueueInstance.addAll(suggestedDrierQueueList.getRange(0, userIndex));
-          List<dynamic> listToUpdate = currentlyUpdatedList.getRange(userIndex, suggestedDrierQueueList.length).toList();
+            //Add the the ones before this user to the updated list as they don't need to be updated
+            correctedForCurrentQueueInstance.addAll(suggestedDrierQueueList.getRange(0, userIndex));
+            List<dynamic> listToUpdate = currentlyUpdatedList.getRange(userIndex, currentlyUpdatedList.length).toList();
 
-          //Get the updated list and add to the correctedForCurrentQueueInstance list
-          int lastTimeAvailable = washerEndTime.millisecondsSinceEpoch;
-          List<dynamic> updatedList = await _getUpdatedList(lastTimeAvailable: lastTimeAvailable, listToUpdate: listToUpdate);
-          correctedForCurrentQueueInstance.addAll(updatedList);
+            //Get the updated list and add to the correctedForCurrentQueueInstance list
+            int lastTimeAvailable = washerEndTime.millisecondsSinceEpoch;
+            List<dynamic> updatedList = await _getUpdatedList(lastTimeAvailable: lastTimeAvailable, listToUpdate: listToUpdate);
+            correctedForCurrentQueueInstance.addAll(updatedList);
 
-          //Update the list
-          currentlyUpdatedList = correctedForCurrentQueueInstance;
-          print('The suggested list was modified by ensureCorreQueueTimes');
-
+            //Update the list
+            currentlyUpdatedList = correctedForCurrentQueueInstance;
+          }
         }
-
       }
     }
-
-    print('The updated drier queue list is as follows: $currentlyUpdatedList}');
 
     //Return the list
     return currentlyUpdatedList;
   }
 
-  ///Gets whether the user is queues in both the washing and drying machines
+  ///Gets whether the user uid (as represented by the uid) is also found in the drier
+  bool _isAlsoQueuedInDrier(String uid, List<QueueData> queueDataList) {
+
+    //Remove all the washer queueData(s)
+    queueDataList.removeWhere((queueData) => queueData.whichMachine == 'washer');
+
+    //Loop through all the drier machines to check if this uid is found there
+    for(QueueData queueData in queueDataList) {
+      for(int i = 0; i < queueData.queueInstances.length; i++) {
+        QueueInstance queueInstance = queueData.queueInstances[i]; //Gets the current queue instance
+        if(queueInstance.user.uid == uid || queueInstance.usersQueuedWith.contains(uid)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  ///Gets whether the user is queued in both the washing and drying machines
   ///Takes in the userWasherQueueInstance and loops through all the driers
-  Map<String, dynamic> _isQueuedInBothWasherAndDrier(Map<String, dynamic> userWasherQueueInstance, List<QueueData> queueDataList) {
+  Map<String, dynamic> _isQueuedInBothWasherAndDrier(Map<String, dynamic> userWasherQueueInstance, List<QueueData> queueDataList, {String specifiedDrierNumber}) {
       String userUid = userWasherQueueInstance['user']['uid'];
 
       //Remove all the washer queueData(s)
       queueDataList.removeWhere((queueData) => queueData.whichMachine == 'washer');
+
+      //If the drierMachineNumber is specified, we want to check for only this machine number. thus, remove all other machines 
+      if(specifiedDrierNumber != null) {
+        queueDataList.removeWhere((queueData) =>
+        queueData.machineNumber != specifiedDrierNumber);
+      }
 
       //The data about the drier instance
       int indexOfDrierInstance;
@@ -573,6 +653,7 @@ class DatabaseService {
   ///If there are no users queues, then we return five minutes from now
   ///If this is the drier queue and between users queued there is space to fit the user, return this time
   ///Else we return five minutes from the last user
+  ///If the QueueDataList is passed, then the user is queuing for the DRIER after they queued for the washer
   Future<int> getQueueTime({String whichQueue, String machineNumber, int availableFrom, int washerEndTime, int drierDurationInMillis}) async {
 
     if (availableFrom != null) {
@@ -587,7 +668,7 @@ class DatabaseService {
     DocumentSnapshot snapshot = await queuedListReference.get();
 
     if (snapshot.data == null || snapshot.data['queue'].length == 0) {
-      return DateTime.now().add(Duration(minutes: 5)).millisecondsSinceEpoch;
+      return DateTime.now().add(Duration(minutes: 2)).millisecondsSinceEpoch; //Revert to minutes (5)
     }
 
     List<dynamic> queueList = snapshot.data['queue'];

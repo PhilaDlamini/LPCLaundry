@@ -33,7 +33,7 @@ class _SignInState extends State<SignIn> {
                   onChanged: (val) => email = val.trim(),
                   validator: (text) =>
                       text.isEmpty ? "Please enter email" : null,
-                  decoration: inputTextDecoration.copyWith(hintText: "Email"),
+                  decoration: createAccountInputDecoration.copyWith(hintText: "Email"),
                 ),
                 SizedBox(
                   height: 16,
@@ -41,7 +41,7 @@ class _SignInState extends State<SignIn> {
                 TextFormField(
                   obscureText: true,
                   decoration:
-                      inputTextDecoration.copyWith(hintText: "Password"),
+                      createAccountInputDecoration.copyWith(hintText: "Password"),
                   onChanged: (val) => password = val.trim(),
                   validator: (value) =>
                       value.isEmpty ? "Please enter password" : null,

@@ -5,11 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
+import 'package:laundryqueue/models/User.dart';
+import 'package:laundryqueue/screens/home/pages/choose.dart';
 import 'package:laundryqueue/screens/home/pages/queue_page.dart';
 import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
 
 class StartQueuing extends StatelessWidget {
+  final User user;
+
+  StartQueuing({this.user});
+
   Future<List> getQueueData() async {
     String washerData =
         await Preferences.getStringData(Preferences.LAST_WASHER_USED_DATA);
@@ -17,8 +23,12 @@ class StartQueuing extends StatelessWidget {
         await Preferences.getStringData(Preferences.LAST_DRIER_USED_DATA);
 
     //Decode the data into maps and create Queue instances
-    QueueInstance washerQueue = washerData != null ? QueueInstance.fromMap(json.decode(washerData)) : null;
-    QueueInstance drierQueue = drierData != null ? QueueInstance.fromMap(json.decode(drierData)) : null;
+    QueueInstance washerQueue = washerData != null
+        ? QueueInstance.fromMap(json.decode(washerData))
+        : null;
+    QueueInstance drierQueue = drierData != null
+        ? QueueInstance.fromMap(json.decode(drierData))
+        : null;
 
     //Return the list
     return [washerQueue, drierQueue];
@@ -26,38 +36,39 @@ class StartQueuing extends StatelessWidget {
 
   Widget summary(QueueInstance queue, String whichMachine) {
     return Container(
-      margin: EdgeInsets.only(top: 16.0),
-      child: queue != null
-          ? Column(
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              dot,
-              Text('$whichMachine #${queue.which}')
-            ],
-          ),
-          Row(
-            children: <Widget>[
-              dot,
-              Text('Finished ${whichMachine == 'Drier' ? 'drying' : 'washing'} ${getDate(queue)}')
-            ],
-          ),
-          Row(
-            children: <Widget>[
-              dot,
-              Text('Queued @ ${queue.displayableTime['timeQueued']}')
-            ],
-          ),
-        ],
-      )
-          : Container(
-        child: Text('No recent data for ${whichMachine.toLowerCase()}'),
-      )
-    );
+        margin: EdgeInsets.only(top: 16.0),
+        child: queue != null
+            ? Column(
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      dot,
+                      Text('$whichMachine #${queue.which}')
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      dot,
+                      Text(
+                          'Finished ${whichMachine == 'Drier' ? 'drying' : 'washing'} ${getDate(queue)}')
+                    ],
+                  ),
+                  Row(
+                    children: <Widget>[
+                      dot,
+                      Text('Queued @ ${queue.displayableTime['timeQueued']}')
+                    ],
+                  ),
+                ],
+              )
+            : Container(
+                child: Text('No recent data for ${whichMachine.toLowerCase()}'),
+              ));
   }
 
   String getDate(QueueInstance queue) {
-    DateTime endTime = DateTime.fromMillisecondsSinceEpoch(queue.endTimeInMillis);
+    DateTime endTime =
+        DateTime.fromMillisecondsSinceEpoch(queue.endTimeInMillis);
     DateTime now = DateTime.now();
     int dayDifference = now.day - endTime.day;
 
@@ -86,14 +97,7 @@ class StartQueuing extends StatelessWidget {
             Scaffold.of(context).openDrawer();
           },
         ),
-        actions: <Widget>[
-          GestureDetector(
-            child: Icon(Icons.more_vert, color: Colors.black),
-            onTap: () {
-              print('More vert in start queuing tapped');
-            },
-          )
-        ],
+        actions: <Widget>[popupMenuButton],
       ),
       body: Container(
         padding: EdgeInsets.only(top: 100),
@@ -116,29 +120,18 @@ class StartQueuing extends StatelessWidget {
               return Container();
             },
           ),
-          Row(
-            children: <Widget>[
-              RaisedButton(
+          Padding(
+            padding: EdgeInsets.only(left: 16.0),
+            child: RaisedButton(
                 child: Text('Queue'),
-                onPressed: () {
+                onPressed: () async {
                   Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => QueuePage(),
-                          settings: RouteSettings(
-                              arguments:
-                                  DataInheritedWidget.of(context).user)));
-                },
-              ),
-              Padding(
-                padding: EdgeInsets.only(right: 16.0),
-                child: RaisedButton(
-                    child: Text('Sign out'),
-                    onPressed: () async {
-                      await AuthService().signOut();
-                    }),
-              )
-            ],
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChooseUsers(user: user),
+                    ),
+                  );
+                }),
           ),
         ]),
       ),
