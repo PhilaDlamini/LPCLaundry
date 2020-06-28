@@ -1,7 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Preferences {
-
   static const String NOTIFY_ON_TURN = 'Notify on turn';
   static const String NOTIFY_WHEN_DONE = 'Notify when done';
   static const String WASHER_USE_CONFIRMED = 'Washer use confirmed';
@@ -14,14 +13,20 @@ class Preferences {
   static const String DRIER_QUEUE_REMOVED_AT_TIME = 'Drier queue removed at time';
   static const String WASHER_QUEUE_EXTENSION_GRANTED = 'Washer queue extension';
   static const String DRIER_QUEUE_EXTENSION_GRANTED = 'Drier queue extension';
+  static const String FIRST_TIME_LOGGED_IN = 'First time logged in';
+  static const String VERIFICATION_EMAIL_SENT = 'Email sent';
 
   //The descriptions for the checkboxes. Used in Settings.dart
   static const String NOTIFY_ON_TURN_DESCRIPTION = "Receive a notification when your turn in the queue is near";
   static const String NOTIFY_WHEN_DONE_DESCRIPTION = "Receive a notification your your clothes are done washing/drying";
+  static const String NOTIFY_WHEN_QUEUED_JOINTLY = "Receive a notification when soemone in your block queues with you";
 
   static Future setDefaultPreferences() async {
+    await updateBoolData(FIRST_TIME_LOGGED_IN, true);
     await updateBoolData(NOTIFY_ON_TURN, true);
     await updateBoolData(NOTIFY_WHEN_DONE, true);
+    await updateBoolData(NOTIFY_WHEN_QUEUED_JOINTLY, true);
+    await updateBoolData(VERIFICATION_EMAIL_SENT, false);
     await updateBoolData(WASHER_USE_CONFIRMED, false);
     await updateBoolData(DRIER_USE_CONFIRMED, false);
     await updateBoolData(WASHER_QUEUE_REMOVED_AT_TIME, false);

@@ -38,6 +38,9 @@ class _ProfileState extends State<Profile> {
   @override
   void initState() {
     user = widget.user;
+    name = user.name;
+    block = user.block;
+    room = user.room;
     isEditing = false;
     isLoading = false;
     super.initState();
@@ -50,11 +53,10 @@ class _ProfileState extends State<Profile> {
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             return Container(
-              width: 90,
-              height: 90,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.0),
                   image: DecorationImage(
                       fit: BoxFit.fill, image: NetworkImage(snapshot.data))),
             );
@@ -64,44 +66,44 @@ class _ProfileState extends State<Profile> {
         });
 
     return Container(
-      constraints: BoxConstraints(maxHeight: 100),
+      width: 140,
       child: Stack(
         children: <Widget>[
           isEditing
               ? _file != null
-                  ? Container(
-                      width: 90,
-                      height: 90,
-                      child: Image.file(_file),
-                    )
-                  : profilePicture
+              ? Container(
+            width: 130,
+            height: 130,
+            child: Image.file(_file),
+          )
+              : profilePicture
               : profilePicture,
           isEditing
               ? Container(
-                  // Is it only restricted to the height + width of the container
-                  width: 90,
-                  height: 90,
-                  child: Align(
-                    alignment: Alignment.bottomRight,
-                    child: InkResponse(
-                      onTap: _pickImage,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.greenAccent,
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+            // Is it only restricted to the height + width of the container
+            width: 130,
+            height: 130,
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: InkResponse(
+                onTap: _pickImage,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.greenAccent,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
                     ),
                   ),
-                )
+                ),
+              ),
+            ),
+          )
               : Container(),
         ],
       ),
@@ -113,190 +115,158 @@ class _ProfileState extends State<Profile> {
     return isLoading
         ? Loading()
         : Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0.0,
-              leading: GestureDetector(
-                child: Icon(
-                  Icons.clear,
-                  color: Colors.black,
-                ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.0,
+        leading: GestureDetector(
+          child: Icon(
+            Icons.clear,
+            color: Colors.black,
+          ),
+          onTap: () {
+            Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
+          },
+        ),
+        title: Text('Profile', style: TextStyle(color: Colors.black)),
+        actions: <Widget>[
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: isEditing
+                ? Container()
+                : GestureDetector(
+                child: Icon(Icons.edit, color: Colors.black),
                 onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              title: Text('Account', style: TextStyle(color: Colors.black)),
-              actions: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(right: 48.0),
-                  child: isEditing
-                      ? Container()
-                      : GestureDetector(
-                          child: Icon(Icons.edit, color: Colors.black),
-                          onTap: () {
-                            setState(() => isEditing = true);
-                          }),
+                  setState(() => isEditing = true);
+                }),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Container(
+          padding: EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: <Widget>[
+                getProfilePicture(),
+                SizedBox(height: 16),
+                profileDataTile(
+                  icon: Icon(
+                    Icons.email,
+                    color: Colors.blueGrey,
+                  ),
+                  title: 'Email',
+                  value: user.email,
+                ),
+                isEditing
+                    ? profileEditTile(
+                  title: 'Name',
+                  icon: Icon(Icons.person, color: Colors.blueGrey),
+                  initialValue: name,
+                  onChanged: (val) => name = val,
+                  validator: (val) =>
+                  val.isEmpty ? 'Enter valid name' : null,
                 )
+                    : profileDataTile(
+                  icon: Icon(
+                    Icons.person,
+                    color: Colors.blueGrey,
+                  ),
+                  title: 'Name',
+                  value: user.name,
+                ),
+                isEditing
+                    ? profileEditTile(
+                  title: 'Block',
+                  icon:
+                  Icon(Icons.business, color: Colors.blueGrey),
+                  onChanged: (val) => block = val,
+                  initialValue: block,
+                  validator: (val) =>
+                  val.isEmpty ? 'Enter valid block' : null,
+                )
+                    : profileDataTile(
+                  icon: Icon(
+                    Icons.business,
+                    color: Colors.blueGrey,
+                  ),
+                  title: 'Block',
+                  value: 'Block ${user.block}',
+                ),
+                isEditing
+                    ? profileEditTile(
+                  title: 'Room',
+                  icon: Icon(Icons.hotel, color: Colors.blueGrey),
+                  onChanged: (val) => room = val,
+                  initialValue: room,
+                  validator: (val) =>
+                  val.isEmpty
+                      ? 'Enter valid room number'
+                      : null,
+                )
+                    : profileDataTile(
+                  icon: Icon(
+                    Icons.hotel,
+                    color: Colors.blueGrey,
+                  ),
+                  title: 'Room',
+                  value: 'Room ${user.room}',
+                ),
+                SizedBox(
+                  height: 24,
+                ),
+                isEditing
+                    ? Container()
+                    : flatButton(
+                  text: 'Log out',
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await AuthService().signOut();
+                  },
+                ),
+                isEditing
+                    ? Container()
+                    : flatButton(
+                  text: 'Delete account',
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await AuthService().deleteAccount(user);
+                  },
+                ),
+                isEditing
+                    ? circleButton(
+                  color: Colors.blueGrey,
+                  icon: Icon(Icons.check, color: Colors.white),
+                  onPressed: () async {
+                    if (_formKey.currentState.validate()) {
+                      setState(() => isLoading = true);
+
+                      //Update the profile picture if not null
+                      if (_file != null) {
+                        await StorageService(
+                            user: user, file: _file)
+                            .uploadImage();
+                      }
+
+                      //Update the rest of the fields
+                      await DatabaseService(user: user)
+                          .updateUserInfo({
+                        'name': name.trim(),
+                        'room': room.trim(),
+                        'block': block.trim()
+                      });
+
+                      Navigator.pop(context);
+                    }
+                  },
+                )
+                    : Container()
               ],
             ),
-            body: Container(
-              padding: EdgeInsets.all(16),
-              child: Stack(children: <Widget>[
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          getProfilePicture(),
-                          isEditing
-                              ? Container(
-                                  padding: EdgeInsets.only(left: 8.0),
-                                  width: 150,
-                                  child: TextFormField(
-                                    onChanged: (val) => name = val,
-                                    validator: (val) =>
-                                        val.isEmpty ? 'Enter valid name' : null,
-                                    decoration: editProfileInputDecoration
-                                        .copyWith(hintText: 'Name'),
-                                  ),
-                                )
-                              : Container(
-                                  padding: EdgeInsets.only(left: 8.0),
-                                  width: 150,
-                                  child: Text(
-                                    user.name,
-                                    style: TextStyle(fontSize: 18),
-                                  ))
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Row(
-                          children: <Widget>[
-                            Icon(Icons.email),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              child: Text('${user.email}'),
-                            )
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: isEditing
-                            ? Container(
-                                width: 150,
-                                child: TextFormField(
-                                  onChanged: (val) => block = val,
-                                  validator: (val) => val.isEmpty
-                                      ? 'Enter valid block number'
-                                      : null,
-                                  decoration:
-                                      editProfileInputDecoration.copyWith(
-                                          icon: Icon(Icons.business),
-                                          hintText: 'Block'),
-                                ),
-                              )
-                            : Row(children: <Widget>[
-                                Icon(Icons.business),
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: Text('Block ${user.block}'),
-                                )
-                              ]),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: isEditing
-                            ? Container(
-                                width: 150,
-                                child: TextFormField(
-                                  onChanged: (val) => room = val,
-                                  validator: (val) => val.isEmpty
-                                      ? 'Enter valid room number'
-                                      : null,
-                                  decoration:
-                                      editProfileInputDecoration.copyWith(
-                                          icon: Icon(Icons.hotel),
-                                          hintText: 'Room'),
-                                ),
-                              )
-                            : Row(children: <Widget>[
-                                Icon(Icons.hotel),
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: Text('Room ${user.room}'),
-                                )
-                              ]),
-                      ),
-                    ],
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: isEditing
-                      ? Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: Icon(Icons.check, color: Colors.white),
-                            onPressed: () async {
-                              if (_formKey.currentState.validate()) {
-                                setState(() => isLoading = true);
-
-                                //Update the profile picture if not null
-                                if (_file != null) {
-                                  await StorageService(user: user, file: _file)
-                                      .uploadImage();
-                                }
-
-                                //Update the rest of the fields
-                                await DatabaseService(user: user)
-                                    .updateUserInfo({
-                                  'name': name,
-                                  'room': room,
-                                  'block': block
-                                });
-
-                                Navigator.pop(context);
-                              }
-                            },
-                          ))
-                      : Container(
-                          height: 100,
-                          child: Column(
-                            children: <Widget>[
-                              Container(
-                                height: 1,
-                                color: Colors.grey,
-                              ),
-                              FlatButton(
-                                child: Text('Log out'),
-                                onPressed: () async {
-                                  //TODO: Fix issue where .setState() / .markNeedsBuild() is said to be called at the wrong time
-                                  Navigator.pop(context);
-                                  await AuthService().signOut();
-                                },
-                              ),
-                              FlatButton(
-                                child: Text('Delete account'),
-                                onPressed: () async {
-                                  //TODO: Fix issue where .setState() / .markNeedsBuild() is said to be called at the wrong time
-                                  Navigator.pop(context);
-                                  await AuthService().deleteAccount(user);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-              ]),
-            ),
-          );
+          ),
+        ),
+      ),
+    );
   }
 }

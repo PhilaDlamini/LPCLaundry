@@ -11,6 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
+	<key>NSPhotoLibraryUsageDescription</key>
 	<string>laundryqueue</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>

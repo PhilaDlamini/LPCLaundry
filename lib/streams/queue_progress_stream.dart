@@ -22,7 +22,7 @@ class QueueProgressStream {
           ? userQueue.timeLeftTillQueueStart
           : userQueue.timeLeftTillQueueEnd;
 
-      double value = 1 - ((timeLeft.inSeconds) / duration.inSeconds); //Again, this -60 ?
+      double value = 1 - ((timeLeft.inSeconds) / duration.inSeconds);
 
       if (timeLeft.inSeconds <= 0) {
         timer.cancel();

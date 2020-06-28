@@ -8,6 +8,7 @@ import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/screens/home/pages/queue_in_progress.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
 import 'package:laundryqueue/screens/home/pages/queued_list_base.dart';
+import 'package:laundryqueue/services/storage.dart';
 
 class Queued extends StatefulWidget {
   final QueueData washerQueueData;
@@ -20,7 +21,6 @@ class Queued extends StatefulWidget {
 }
 
 class _QueuedState extends State<Queued> {
-
   User user;
   Widget washerPage;
   Widget drierPage;
@@ -63,7 +63,7 @@ class _QueuedState extends State<Queued> {
     washerPage = _queueInProgress(userWasherQueueInstance)
         ? QueueInProgress(
             userQueueInstance: userWasherQueueInstance,
-            title: 'Washing in progress',
+            title: 'Washing',
             whichQueue: 'washer queue',
             enableQueuing: !hasDrierQueueData,
             machineNumber: widget.washerQueueData.machineNumber,
@@ -77,14 +77,16 @@ class _QueuedState extends State<Queued> {
                 machineNumber: widget.washerQueueData.machineNumber,
                 machineType: widget.washerQueueData.whichMachine,
                 enableQueuing: !hasDrierQueueData,
+                hideAppBar: hasDrierQueueData,
                 toggle: _toggle,
+                queuedUnderOtherUser: washerQueueData.queuedUnderOtherUser,
               )
             : null;
 
     drierPage = _queueInProgress(userDrierQueueInstance)
         ? QueueInProgress(
             userQueueInstance: userDrierQueueInstance,
-            title: 'Drying in progress',
+            title: 'Drying',
             whichQueue: 'drier queue',
             enableQueuing: false,
             machineNumber: widget.drierQueueData.machineNumber,
@@ -97,15 +99,15 @@ class _QueuedState extends State<Queued> {
                 userQueueInstance: userDrierQueueInstance,
                 machineNumber: widget.drierQueueData.machineNumber,
                 enableQueuing: false,
-                //Once the user has queued for the drier, they can't then queue for the washer (order conflict)
+                hideAppBar: hasWasherQueueData,
                 machineType: widget.drierQueueData.whichMachine,
+                queuedUnderOtherUser: drierQueueData.queuedUnderOtherUser,
                 toggle: _toggle,
               )
             : null;
 
     return 'Done';
   }
-
 
   void _toggle() {
     setState(() {}); //Redraws
@@ -120,7 +122,8 @@ class _QueuedState extends State<Queued> {
 
   @override
   void didUpdateWidget(Queued oldWidget) {
-    if(washerQueueData != oldWidget.washerQueueData || drierQueueData != oldWidget.drierQueueData) {
+    if (washerQueueData != oldWidget.washerQueueData ||
+        drierQueueData != oldWidget.drierQueueData) {
       setState(() {
         washerQueueData = widget.washerQueueData;
         drierQueueData = widget.drierQueueData;
@@ -146,15 +149,55 @@ class _QueuedState extends State<Queued> {
             length: 2,
             child: Scaffold(
               appBar: AppBar(
-                leading: GestureDetector(child: Icon(Icons.menu)),
+                elevation: 0,
+                leading: GestureDetector(
+                    child: Icon(Icons.menu),
+                    onTap: () {
+                      Scaffold.of(context).openDrawer();
+                    }),
+                title: Text('Block ${user.block} queue'),
                 actions: <Widget>[
-                  GestureDetector(child: Icon(Icons.more_vert))
+                  GestureDetector(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: FutureBuilder(
+                        future: StorageService(user: user).getImageURL(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Container(
+                              width: 24,
+                              child: CircleAvatar(
+                                backgroundColor: Colors.white,
+                              ),
+                            );
+                          }
+
+                          return SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircleAvatar(
+                              // backgroundImage: NetworkImage(snapshot.data),
+                              backgroundColor: Colors.white70,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  )
                 ],
-                title: Text('Laundry'),
                 bottom: TabBar(
+                  indicatorColor: Colors.blueGrey,
+                  labelPadding: EdgeInsets.all(8),
+                  indicatorPadding: EdgeInsets.symmetric(horizontal: 32),
                   tabs: <Widget>[
-                    Tab(text: 'Washer'),
-                    Tab(text: 'Drier'),
+                    Icon(
+                      Icons.fiber_smart_record,
+                      color: Colors.blueGrey[700],
+                    ),
+                    Icon(
+                      Icons.wb_sunny,
+                      color: Colors.blueGrey[700],
+                    ),
                   ],
                 ),
               ),

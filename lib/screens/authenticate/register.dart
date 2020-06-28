@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +8,7 @@ import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
 import 'package:laundryqueue/widgets/loading.dart';
+import 'package:laundryqueue/widgets/progress.dart';
 
 class Register extends StatefulWidget {
   final Function toggle;
@@ -30,6 +32,7 @@ class RegisterState extends State<Register> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool loading = false;
 
+
   Future _pickImage() async {
     var imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
     setState(() {
@@ -37,25 +40,95 @@ class RegisterState extends State<Register> {
     });
   }
 
+  void _start() async {
+      if (_formKey.currentState.validate()) {
+        if (_file != null) {
+          setState(() => loading = true);
+
+          dynamic result =
+          await _auth.registerWithEmailAndPassword(
+              block: block,
+              name: name,
+              room: room,
+              email: lpcEmail,
+              file: _file,
+              password: password);
+
+          if (result is PlatformException) {
+            setState(() => loading = false);
+            Scaffold.of(context).showSnackBar(
+              SnackBar(
+                duration: Duration(seconds: 3),
+                content: Text("Error: ${result.message}"),
+              ),
+            );
+          } else if (result == null) {
+            setState(() => loading = false);
+            Scaffold.of(context).showSnackBar(
+              SnackBar(
+                duration: Duration(seconds: 3),
+                content: Text(
+                    "Unknown error signing up. Please try again"),
+              ),
+            );
+          }
+
+          //Set up default SharedPreferences values
+          await Preferences.setDefaultPreferences();
+          widget.toggleWrapper();
+        } else {
+          Scaffold.of(context).showSnackBar(
+              SnackBar(content: Text('Select an image')));
+        }
+      }
+  }
+
+  Widget _getInputFields() {
+    return Column(
+      children: <Widget>[
+        textFormField('Email',
+          onChanged: (val) => lpcEmail = val.trim(),
+          validator: (text) =>
+          text.isEmpty ? 'Enter valid email' : null,
+        ),
+        textFormField('Password',
+            onChanged: (val) => password = val.trim(),
+            validator: (text) =>
+            text.isEmpty ? 'Enter valid password' : null,
+            obscureText: true),
+        textFormField(
+          'Block',
+          onChanged: (val) => block = val.trim(),
+          validator: (text) =>
+          text.isEmpty ? 'Enter valid block' : null,
+        ),
+        textFormField('Room',
+          onChanged: (val) => room = val.trim(),
+          validator: (text) =>
+          text.isEmpty ? 'Eneter valid room' : null,),
+      ],
+    );
+  }
+
   Widget getImageSelector() {
     return Container(
       constraints: BoxConstraints(maxHeight: 85),
       child: Stack(
         children: <Widget>[
-          Container(
+         Container(
             width: 80,
             height: 80,
-            decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.0)),
-            child: _file != null
-                ? Image.file(
-                  _file,
-                  fit: BoxFit.fill,
-                )
-                : CircleAvatar(
-                    backgroundColor: Colors.blueGrey,
-                  ),
+           decoration: BoxDecoration(
+             shape: BoxShape.circle,
+             border: Border.all(
+               color: Colors.white,
+               width: 1,
+             )
+           ),
+           child:_file == null ? CircleAvatar(
+             backgroundColor: Colors.white,) :
+             CircleAvatar(backgroundImage: FileImage(_file),
+             )
           ),
           Container(
             // Is it only restricted to the height + width of the container
@@ -70,7 +143,7 @@ class RegisterState extends State<Register> {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.greenAccent,
+                    color: Colors.greenAccent
                   ),
                   child: Center(
                     child: Icon(
@@ -81,145 +154,143 @@ class RegisterState extends State<Register> {
                 ),
               ),
             ),
-          ),
+          ), // For the image image picker
         ],
       ),
     );
   }
 
+  Widget _portraitWidget(double height, double width) {
+    return Column(
+      children: <Widget>[
+        Container(
+          margin: EdgeInsets.only(top: 42, left: 16),
+          child: Row(
+            children: <Widget>[
+              getImageSelector(),
+              Container(
+                padding: EdgeInsets.only(left: 8.0),
+                constraints: BoxConstraints(maxWidth: 150),
+                child: TextFormField(
+                    validator: (value) =>
+                    value.isEmpty ? "Enter a valid name" : null,
+                    onChanged: (newString) => name = newString.trim(),
+                    decoration: InputDecoration.collapsed(
+                        hintText: "Name",
+                        hintStyle: TextStyle(fontSize: 15)
+                    )),
+              )
+            ],
+          ),
+        ),
+        Container(
+          height: height - 152,
+          width: width,
+          margin: EdgeInsets.only(top: 30),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16))),
+          child: Column(children: <Widget>[
+            _getInputFields(),
+            Container(
+              width: 175,
+              margin: EdgeInsets.only(top: 32),
+              child: Row(children: <Widget>[
+                roundedButton(
+                  onTapped: _start,
+                  text: 'Sign up',
+                ),
+                FlatButton(
+                  child: Text('Log in'),
+                  onPressed: widget.toggle,
+                  splashColor: Colors.yellow[100],
+                ),
+              ],
+              ),
+            ),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _landscapeWidget(double height, double width) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          flex: 1,
+          child: Column(
+            children: <Widget> [
+              getImageSelector(),
+          Container(
+                    padding: EdgeInsets.only(left: 8.0),
+                    constraints: BoxConstraints(maxWidth: 150),
+                    child: TextFormField(
+                      textAlign: TextAlign.center,
+                        validator: (value) =>
+                        value.isEmpty ? "Enter a valid name" : null,
+                        onChanged: (newString) => name = newString.trim(),
+                        decoration: InputDecoration.collapsed(
+                            hintText: "Name",
+                            hintStyle: TextStyle(fontSize: 15)
+                        )),
+                  ),
+              Container(
+                width: 175,
+                margin: EdgeInsets.only(top: 32),
+                child: Row(children: <Widget>[
+                  roundedButton(
+                    color: Colors.white70,
+                    onTapped: _start,
+                    text: 'Start',
+                  ),
+                  FlatButton(
+                    child: Text('Sign in'),
+                    onPressed: widget.toggle,
+                    splashColor: Colors.yellow[100],
+                  ),
+                ],
+                ),
+              ),
+
+          ]),
+        ),
+        Expanded(
+          flex: 1,
+          child: Container(
+            height: height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), topLeft: Radius.circular(16)),
+              color: Colors.white
+            ),
+            child: SingleChildScrollView(
+              child: _getInputFields(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    MediaQueryData mediaQueryData = MediaQuery.of(context);
+    bool isPortrait = mediaQueryData.orientation == Orientation.portrait;
+    double height = mediaQueryData.size.height;
+    double width = mediaQueryData.size.width;
+
     return loading
-        ? Loading()
+        ? Progress(message: 'Setting you up')
         : Scaffold(
-            backgroundColor: Colors.brown[100],
-            body: Container(
-                padding: EdgeInsets.all(16.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: <Widget>[
-                      SizedBox(height: 16),
-                      Row(
-                        children: <Widget>[
-                          getImageSelector(),
-                          Container(
-                            padding: EdgeInsets.only(left: 8.0),
-                            constraints: BoxConstraints(maxWidth: 150),
-                            child: TextFormField(
-                                validator: (value) =>
-                                    value.isEmpty ? "Enter a valid name" : null,
-                                onChanged: (newString) =>
-                                    name = newString.trim(),
-                                decoration: InputDecoration.collapsed(
-                                  hintText: "Name",
-                                )),
-                          )
-                        ],
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                          onChanged: (newString) => lpcEmail = newString.trim(),
-                          decoration: createAccountInputDecoration.copyWith(
-                              hintText: "Email address",
-                              icon: Icon(Icons.email)),
-                          validator: (value) => value.isEmpty
-                              ? "Enter a valid email address"
-                              : null),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        obscureText: true,
-                        onChanged: (newString) => password = newString.trim(),
-                        decoration: createAccountInputDecoration.copyWith(
-                            hintText: "Password", icon: Icon(Icons.security)),
-                        validator: (value) =>
-                            value.isEmpty ? "Enter a valid password" : null,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        onChanged: (newString) => block = newString.trim(),
-                        decoration: createAccountInputDecoration.copyWith(
-                            hintText: "Block", icon: Icon(Icons.business)),
-                        validator: (value) =>
-                            value.isEmpty ? "Entere a block number" : null,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                          onChanged: (newString) => room = newString.trim(),
-                          decoration: createAccountInputDecoration.copyWith(
-                              hintText: "Room", icon: Icon(Icons.hotel)),
-                          validator: (value) =>
-                              value.isEmpty ? "Enter a room number" : null),
-                      SizedBox(height: 16),
-                      Row(
-                        children: <Widget>[
-                          InkResponse(
-                            onTap: () async {
-                              if (_formKey.currentState.validate()) {
-                                if (_file != null) {
-                                  setState(() => loading = true);
-
-                                  dynamic result =
-                                      await _auth.registerWithEmailAndPassword(
-                                          block: block,
-                                          name: name,
-                                          room: room,
-                                          email: lpcEmail,
-                                          file: _file,
-                                          password: password);
-
-                                  if (result is PlatformException) {
-                                    setState(() => loading = false);
-                                    Scaffold.of(context).showSnackBar(
-                                      SnackBar(
-                                        duration: Duration(seconds: 3),
-                                        content:
-                                            Text("Error: ${result.message}"),
-                                      ),
-                                    );
-                                  } else if (result == null) {
-                                    setState(() => loading = false);
-                                    Scaffold.of(context).showSnackBar(
-                                      SnackBar(
-                                        duration: Duration(seconds: 3),
-                                        content: Text(
-                                            "Unknown error signing up. Please try again"),
-                                      ),
-                                    );
-                                  }
-
-                                  //Set up default SharedPreferences values
-                                  await Preferences.setDefaultPreferences();
-                                  widget.toggleWrapper();
-                                } else {
-                                  Scaffold.of(context).showSnackBar(SnackBar(
-                                      content: Text('Select an image')));
-                                }
-                              }
-                            },
-                            child: Container(
-                                width: 100,
-                                height: 50,
-                                margin: EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.pink,
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(20)),
-                                ),
-                                child: Center(
-                                  child: Text("START", style: TextStyle()),
-                                ) // Find out how to make text be all caps
-                                ),
-                          ),
-                          FlatButton(
-                            child: Text("Sign in"),
-                            onPressed: widget.toggle,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                )),
-          );
+            backgroundColor: Colors.yellow,
+            body: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                child: isPortrait ? _portraitWidget(height, width) : _landscapeWidget(height, width),
+              )
+            ),
+    );
   }
 }

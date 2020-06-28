@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
 import 'package:laundryqueue/models/User.dart';
@@ -59,7 +58,17 @@ class DatabaseService {
         users.add(currentUser);
       }
     }
-    return users.isEmpty ? 'No other users in Block ${user.block}' : users;
+    return users.isEmpty ? 'No other people in block ${user.block}' : users;
+  }
+
+  //Updates the machine availability
+  Future updateMachineAvailability(String whichQueue, Map<String, List<bool>> data) async =>
+      await _fireStore.collection(whichQueue).document('Block ${user.block}').updateData(data);
+
+  //Flushes all the in the queue after a machine has been disabled
+  Future flushAllInQueue() async {
+    //TODO: Implement this method
+    return null;
   }
 
   //Queues the user for the specified machine at the specified location
@@ -107,7 +116,9 @@ class DatabaseService {
     //Save the queue data to preferences (for the summary later)
     String key = whichQueue == 'washer queue' ? Preferences.LAST_WASHER_USED_DATA : Preferences.LAST_DRIER_USED_DATA;
     String jsonData = json.encode(queue.toSummaryMap(machineNumber));
+    print('summary data to save: $jsonData');
     await Preferences.updateStringData(key, jsonData);
+    print('Should have saved this data now');
 
     //If this is the washer queue, check to see if the user also queued for the drier. If not, reset queue status. Else, wait
     List<String> uIDs = queue.usersQueuedWith;
@@ -614,8 +625,7 @@ class DatabaseService {
 
 
   //Recommends a machine depending on the shortest wait time
-  Future<Map<String, dynamic>> recommendMachine(
-      {List<String> machines, String whichQueue}) async {
+  Future<Map<String, dynamic>> recommendMachine({List<String> machines, String whichQueue}) async {
     String recommendedMachine = machines[0];
     int shortestWaitTime = await getQueueTime(
         machineNumber: recommendedMachine, whichQueue: whichQueue);
@@ -634,6 +644,54 @@ class DatabaseService {
       'machine': '$recommendedMachine (recommended)',
       'startTime': shortestWaitTime
     };
+  }
+
+  ///Gets the list of enabled machines from the database
+  Future getMachines(String whichQueue, {bool onlyAddIfEnabled = true}) async {
+    List<String> availableMachines = List<String>();
+    Map<String, bool> machinesData = Map<String, bool>();
+    DocumentSnapshot snapshot = await _fireStore.collection(whichQueue).document('Block ${user.block}').get();
+    List machinesStates = snapshot.data['machines'];
+
+    if(onlyAddIfEnabled) {
+      for(int i = 0; i < machinesStates.length; i++) {
+        if (machinesStates[i]) {
+          availableMachines.add('${i + 1}');
+        }
+      }
+
+      return availableMachines;
+    }
+
+
+    for(int i = 0; i < machinesStates.length; i++) {
+      machinesData['${i + 1}'] = machinesStates[i];
+    }
+
+    return machinesData;
+  }
+
+  ///Loads the available washer and drier machines
+  Future<Map<String, dynamic>> loadAvailableMachines({bool getEnabledOnly = true}) async{
+
+    if(getEnabledOnly) {
+      List<String> washingMachines = await getMachines('washer queue');
+      List<String> dryingMachines = await getMachines('drier queue');
+
+      return {
+        'washers': washingMachines,
+        'driers': dryingMachines
+      };
+    }
+
+    Map<String, dynamic> washingMachines = await getMachines('washer queue', onlyAddIfEnabled: false);
+    Map<String, dynamic> dryingMachines = await getMachines('drier queue', onlyAddIfEnabled: false);
+
+    return {
+      'washers': washingMachines,
+      'driers': dryingMachines
+    };
+
   }
 
   ///Gets the recommended drier and washer and their wait times
@@ -668,7 +726,7 @@ class DatabaseService {
     DocumentSnapshot snapshot = await queuedListReference.get();
 
     if (snapshot.data == null || snapshot.data['queue'].length == 0) {
-      return DateTime.now().add(Duration(minutes: 2)).millisecondsSinceEpoch; //Revert to minutes (5)
+      return DateTime.now().add(Duration(seconds: 5)).millisecondsSinceEpoch; //TODO revert back to minutes
     }
 
     List<dynamic> queueList = snapshot.data['queue'];

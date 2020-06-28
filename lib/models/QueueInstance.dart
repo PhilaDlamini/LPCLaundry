@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 import 'package:laundryqueue/services/database.dart';
-
 import 'User.dart';
 
 class QueueInstance extends Equatable{
@@ -41,15 +40,13 @@ class QueueInstance extends Equatable{
   }
 
   Map<String, dynamic> toSummaryMap(String machineNumber) {
+    //Note: users queued under other users will not save the summary as they do not start the isolates
     return {
       'which' : machineNumber,
       'endTime' : endTimeInMillis,
       'timeQueued' : timeQueuedInMillis,
        'queuedWith' : usersQueuedWith,
       'startTime' : startTimeInMillis,
-
-
-      //Do we save who this user queued with too?
     };
   }
 
@@ -58,12 +55,18 @@ class QueueInstance extends Equatable{
     DateTime endTime = DateTime.fromMillisecondsSinceEpoch(endTimeInMillis);
     DateTime timeQueued = DateTime.fromMillisecondsSinceEpoch(timeQueuedInMillis);
 
-    //Make sure the minutes are two-digit
+    //Make sure the time is two-digit
+    String startTimeMinute = '${startTime.minute}'.length == 1 ? '0${startTime.minute}' : '${startTime.minute}';
+    String startTimeHour = '${startTime.hour}'.length == 1 ? '0${startTime.hour}' : '${startTime.hour}';
+    String endTimeMinute = '${endTime.minute}'.length == 1 ? '0${endTime.minute}' : '${endTime.minute}';
+    String endTimeHour = '${endTime.hour}'.length == 1 ? '0${endTime.hour}' : '${endTime.hour}';
+    String timeQueuedMinute = '${timeQueued.minute}'.length == 1 ? '0${timeQueued.minute}' : '${timeQueued.minute}';
+    String timeQueuedHour = '${timeQueued.hour}'.length == 1 ? '0${timeQueued.hour}' : '${timeQueued.hour}';
 
     return {
-      'startTime' : startTime != null ? '${startTime.hour}:${startTime.minute}' : null,
-      'endTime' : '${endTime.hour}:${endTime.minute}',
-      'timeQueued' : '${timeQueued.hour}:${timeQueued.minute}'
+      'startTime' : startTime != null ? '$startTimeHour:$startTimeMinute' : null,
+      'endTime' : '$endTimeHour:$endTimeMinute',
+      'timeQueued' : '$timeQueuedHour:$timeQueuedMinute'
     };
   }
 

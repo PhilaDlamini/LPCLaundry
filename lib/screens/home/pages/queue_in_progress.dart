@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/data_handlers/queue_data.dart';
 import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
@@ -7,8 +9,11 @@ import 'package:laundryqueue/screens/home/pages/choose.dart';
 import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/services/database.dart';
 import 'package:laundryqueue/services/shared_preferences.dart';
+import 'package:laundryqueue/services/storage.dart';
 import 'package:laundryqueue/streams/count_down.dart';
 import 'package:laundryqueue/streams/queue_progress_stream.dart';
+import 'package:laundryqueue/widgets/custom_dialog.dart';
+import 'package:laundryqueue/widgets/liquid_progress.dart';
 
 class QueueInProgress extends StatefulWidget {
   final QueueInstance userQueueInstance;
@@ -18,180 +23,116 @@ class QueueInProgress extends StatefulWidget {
   final bool queueUnderOtherUser;
   final bool enableQueuing;
 
-  QueueInProgress({this.userQueueInstance,
-    this.title,
-    this.machineNumber,
-    this.queueUnderOtherUser,
-    this.enableQueuing,
-    this.whichQueue});
+  QueueInProgress(
+      {this.userQueueInstance,
+      this.title,
+      this.machineNumber,
+      this.queueUnderOtherUser,
+      this.enableQueuing,
+      this.whichQueue});
 
-  static String getKey(String whichQueue) =>
-      whichQueue == 'washer queue'
-          ? Preferences.WASHER_USE_CONFIRMED
-          : Preferences.DRIER_USE_CONFIRMED;
+  static String getKey(String whichQueue) => whichQueue == 'washer queue'
+      ? Preferences.WASHER_USE_CONFIRMED
+      : Preferences.DRIER_USE_CONFIRMED;
 
   @override
   State<StatefulWidget> createState() => _QueueInProgressState();
 }
 
-class _QueueInProgressState extends State<QueueInProgress> {
-  final List<String> timeExtensions = [
-    'Select duration',
-    '1 minutes',
-    '5 minutes',
-    '10 minutes',
-    '20 minutes',
-    '40 minutes',
-    '60 minutes'
-  ];
+class _QueueInProgressState extends State<QueueInProgress>
+    with SingleTickerProviderStateMixin {
   List<QueueData> _queueDataList;
   Duration _confirmationLeeWay;
   bool machineUseConfirmed;
   bool askingForExtension = false;
   String key;
-  String currentTimeExtension = 'Select duration';
   int _secondsLeft;
   bool queuedUnderOtherUser;
   QueueInstance userQueueInstance;
-  GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  void _showUnQueueConfirmationDialog() async {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => AlertDialog(
-        title: Text('Leave queue'),
-        content: Text(
-            'If you quit, you will be removed from the queue even before you are done using the machine, and other users'
-                'will go in your place. To use this machine, you will have to queue again.\nAre you sure you want to quit?'),
-        actions: <Widget>[
-          FlatButton(
-            child: Text('Cancel'),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
-          FlatButton(
-            child: Text('Yes'),
-            onPressed: () async {
-
-              //Notify isolates of removal
-              await _notifyIsolateOfRemoval();
-
-              //Remove the alert dialog
-              Navigator.pop(context);
-
-              //Un-queue this user
-              await DatabaseService(
-                  whichQueue: widget.whichQueue,
-                  location: 'Block ${widget.userQueueInstance.user.block}',
-                  machineNumber: widget.machineNumber)
-                  .unQueueUser(queue: widget.userQueueInstance, queueDataList: _queueDataList);
-            },
-          ),
-        ],
-      ),
+  void extendTime(Duration duration) async {
+    await DatabaseService(
+            whichQueue: widget.whichQueue,
+            machineNumber: widget.machineNumber,
+            location: 'Block ${widget.userQueueInstance.user.block}')
+        .grantExtension(
+      queueInstance: widget.userQueueInstance,
+      timeExtensionInMillis: duration.inMilliseconds,
+      queueDataList: DataInheritedWidget.of(context).queueDataList,
     );
+
+    //Notify isolates of this extensions (so the queue is not finished at the previous time)
+    _notifyIsolateOfRemoval();
+
+    //Also, save that at extension was granted for this queue
+    _extensionGranted();
   }
 
   void _showSkipAlertDialog() async {
     //Check if the machine use is confirmed before showing the alert dialog
     await isMachineUseConfirmed();
-    String machine = widget.whichQueue == 'washer queue'
-        ? 'washing machine'
-        : 'drier';
+    String machine =
+        widget.whichQueue == 'washer queue' ? 'washing machine' : 'drier';
 
     if (_confirmationLeeWay.inSeconds < 60 && !machineUseConfirmed) {
-      showDialog(
-          barrierDismissible: false,
-          builder: (context) =>
-              AlertDialog(
-                title: Text('Confirm machine use'),
-                content: Container(
-                  height: 150,
-                  child: Column(
-                    children: <Widget>[
-                      Text(
-                          'Confirm that you have started using the $machine. Otherwise you will be skipped and others will go before you'),
-                      StreamBuilder(
-                          stream: CountDown(
-                              duration: Duration(seconds: _secondsLeft))
-                              .stream,
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData) {
-                              //Remove the alert dialog when we get to zero (at his point too, the isolate will skip the user)
-                              if (snapshot.data.trim() == '0s') {
-                                Timer.run(() => Navigator.pop(context));
-                              }
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CustomDialog(
+        title: 'Confirm machine use',
+        message:
+            'Confirm that you have started using the $machine. Otherwise, you will be skipped and others will go before you',
+        showTimer: true,
+        negativeButtonName: 'Un-queue',
+        negativeOnTap: () async {
+          //Notifies the isolate for this queue that the queue no longer exists
+          _notifyIsolateOfRemoval();
 
-                              return Padding(
-                                  padding: EdgeInsets.only(top: 16),
-                                  child: Center(
-                                    child: Column(
-                                      children: <Widget>[
-                                        Text('Time Left'),
-                                        Row(
-                                          mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                          children: <Widget>[
-                                            Icon(
-                                              Icons.timelapse,
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                  left: 4.0),
-                                              child: Text('${snapshot.data}'),
-                                            )
-                                          ],
-                                        )
-                                      ],
-                                    ),
-                                  ));
-                            }
+          //Remove the alert dialog
+          Navigator.pop(context);
 
-                            return Container();
-                          })
-                    ],
-                  ),
-                ),
-                actions: <Widget>[
-                  FlatButton(
-                    child: Text('Un-queue'),
-                    onPressed: () async {
+          //Un-queue this user
+          await DatabaseService(
+                  whichQueue: widget.whichQueue,
+                  location: 'Block ${widget.userQueueInstance.user.block}',
+                  machineNumber: widget.machineNumber)
+              .unQueueUser(
+                  queue: widget.userQueueInstance,
+                  queueDataList: _queueDataList);
+        },
+        positiveOnTap: () async {
+          Navigator.pop(context);
+          await Preferences.updateBoolData(key, true);
+          setState(() {});
+        },
+        positiveButtonName: 'Confirm',
+        secondsLeft:  _secondsLeft,
+      ),
+    );
+      }
+  }
 
-                      //Notifies the isolate for this queue that the queue no longer exists
-                      _notifyIsolateOfRemoval();
-
-                      //Remove the alert dialog
-                      Navigator.pop(context);
-
-                      //Un-queue this user
-                      await DatabaseService(
-                          whichQueue: widget.whichQueue,
-                          location: 'Block ${widget.userQueueInstance.user.block}',
-                          machineNumber: widget.machineNumber)
-                          .unQueueUser(queue: widget.userQueueInstance, queueDataList: _queueDataList);
-                    },
-                  ),
-                  FlatButton(
-                    child: Text('Confirm'),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await Preferences.updateBoolData(key, true);
-                      setState(() {});
-                    },
-                  )
-                ],
-              ),
-          context: context);
-    }
+  void _showSelectTimeDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CustomDialog(
+        title: 'Extend by',
+        negativeButtonName: 'Cancel',
+        positiveButtonName: 'OK',
+        extendTime: extendTime,
+        radioButton: true,
+      ),
+    );
   }
 
   Future _notifyIsolateOfRemoval() async {
-    if(widget.whichQueue == 'washer queue') {
-      await Preferences.updateBoolData(Preferences.WASHER_QUEUE_REMOVED_AT_TIME, true);
+    if (widget.whichQueue == 'washer queue') {
+      await Preferences.updateBoolData(
+          Preferences.WASHER_QUEUE_REMOVED_AT_TIME, true);
     } else {
-      await Preferences.updateBoolData(Preferences.DRIER_QUEUE_REMOVED_AT_TIME, true);
+      await Preferences.updateBoolData(
+          Preferences.DRIER_QUEUE_REMOVED_AT_TIME, true);
     }
   }
 
@@ -201,16 +142,76 @@ class _QueueInProgressState extends State<QueueInProgress> {
   }
 
   Future _extensionGranted() async {
-    if(widget.whichQueue == 'washer queue') {
-      await Preferences.updateBoolData(Preferences.WASHER_QUEUE_EXTENSION_GRANTED, true);
+    if (widget.whichQueue == 'washer queue') {
+      await Preferences.updateBoolData(
+          Preferences.WASHER_QUEUE_EXTENSION_GRANTED, true);
     } else {
-      await Preferences.updateBoolData(Preferences.DRIER_QUEUE_EXTENSION_GRANTED, true);
+      await Preferences.updateBoolData(
+          Preferences.DRIER_QUEUE_EXTENSION_GRANTED, true);
     }
+  }
+
+  Widget getBottomButtons(bool isLandscape) {
+    return Expanded(
+      flex: isLandscape ? 2 : 1,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: <Widget>[
+          circularButton(
+              icon: Icon(Icons.delete, color: Colors.blueGrey),
+              onTap: queuedUnderOtherUser
+                  ? null
+                  : () async {
+                      showUnQueueConfirmationDialog(
+                        context,
+                        onConfirmed: () async {
+                          //Notify isolates of removal
+                          await _notifyIsolateOfRemoval();
+
+                          //Remove the alert dialog
+                          Navigator.pop(context);
+
+                          //Un-queue this user
+                          await DatabaseService(
+                                  whichQueue: widget.whichQueue,
+                                  location:
+                                      'Block ${widget.userQueueInstance.user.block}',
+                                  machineNumber: widget.machineNumber)
+                              .unQueueUser(
+                                  queue: widget.userQueueInstance,
+                                  queueDataList: _queueDataList);
+                        },
+                      );
+                    }),
+          circularButton(
+              icon: Icon(Icons.extension, color: Colors.blueGrey),
+              onTap: queuedUnderOtherUser ? null : _showSelectTimeDialog),
+          Offstage(
+              offstage: !widget.enableQueuing,
+              child: circularButton(
+                icon: Icon(Icons.queue, color: Colors.blueGrey),
+                onTap: () async {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChooseUsers(
+                        isWashing: false,
+                        isDrying: true,
+                        user: userQueueInstance.user,
+                        washerQueueInstance: userQueueInstance,
+                      ),
+                    ),
+                  );
+                },
+              ))
+        ],
+      ),
+    );
   }
 
   @override
   void didUpdateWidget(QueueInProgress oldWidget) {
-    if(userQueueInstance != oldWidget.userQueueInstance) {
+    if (userQueueInstance != oldWidget.userQueueInstance) {
       setState(() {
         userQueueInstance = widget.userQueueInstance;
       });
@@ -223,11 +224,10 @@ class _QueueInProgressState extends State<QueueInProgress> {
     queuedUnderOtherUser = widget.queueUnderOtherUser;
     userQueueInstance = widget.userQueueInstance;
     _confirmationLeeWay = DateTime.now().difference(
-        DateTime.fromMillisecondsSinceEpoch(
-            widget.userQueueInstance.startTimeInMillis));
+        DateTime.fromMillisecondsSinceEpoch(userQueueInstance.startTimeInMillis));
     _secondsLeft = 60 - _confirmationLeeWay.inSeconds;
     key = QueueInProgress.getKey(widget.whichQueue);
-    if(!queuedUnderOtherUser) {
+    if (!queuedUnderOtherUser) {
       _showSkipAlertDialog();
     }
     super.initState();
@@ -236,159 +236,131 @@ class _QueueInProgressState extends State<QueueInProgress> {
   @override
   Widget build(BuildContext context) {
     _queueDataList = DataInheritedWidget.of(context).queueDataList;
+    bool isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
-    return StreamBuilder(
-      stream: CountDown(
-          duration: widget.userQueueInstance.timeLeftTillQueueEnd)
-          .stream,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return Scaffold(
-            appBar: AppBar(
-              elevation: 0,
-              backgroundColor: Colors.white,
-              title: Text(
-                widget.title,
-                style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.normal),
-              ),
-              actions: <Widget>[
-                Icon(
-                  Icons.more_vert,
-                  color: Colors.black,
-                )
-              ],
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  StreamBuilder(
-                      stream: QueueProgressStream(
-                          userQueue: widget.userQueueInstance,
-                          type: 'till queueEnd')
-                          .stream,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          return Container(
-                            width: 150,
-                            height: 150,
-                            decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.brown[200]),
-                            child: CircularProgressIndicator(
-                              value: snapshot.data,
-                              strokeWidth: 2,
-                            ),
-                          );
-                        }
-
-                        return Container();
-                      }),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: Text(
-                      'Done @${widget.userQueueInstance
-                          .displayableTime['endTime']}',
-                      style: TextStyle(fontSize: 25),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
+    return Scaffold(
+      backgroundColor: Colors.blueGrey[100],
+      appBar: AppBar(
+        backgroundColor: Colors.blueGrey[100],
+        elevation: 0,
+        leading: GestureDetector(
+            child: Icon(Icons.menu),
+            onTap: () {
+              Scaffold.of(context).openDrawer();
+            }),
+        title: Text(widget.title),
+        actions: <Widget>[
+          Center(
+            child: StreamBuilder(
+              stream:
+                  CountDown(duration: userQueueInstance.timeLeftTillQueueEnd)
+                      .stream,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return Container(
+                    padding: EdgeInsets.only(right: 16),
                     child: Text(
                       '${snapshot.data}',
-                      style: TextStyle(fontSize: 25),
+                      style: TextStyle(),
                     ),
-                  ),
-                  SizedBox(
-                    height: 20,
-                  ),
-                  Offstage(
-                    //TODO: Modify upon redesigning this screen
-                      offstage: !askingForExtension,
-                      child: Form(
-                        key: _formKey,
-                        child: DropdownButtonFormField<String>(
-                          items: timeExtensions.map((item) {
-                            return DropdownMenuItem(
-                              child: Text(item),
-                              value: item,
-                            );
-                          }).toList(),
-                          onChanged: (newItem) =>
-                              setState(
-                                      () => currentTimeExtension = newItem),
-                          value: currentTimeExtension,
-                        ),
-                      )),
-                  RaisedButton(
-                      child: Text('Quit'),
-                      onPressed: queuedUnderOtherUser ? null : () async {
-                        _showUnQueueConfirmationDialog();
-                      }),
-                  RaisedButton(
-                      child: Text('Extend time'),
-                      onPressed: queuedUnderOtherUser ? null : () async {
-                        if (askingForExtension) {
-                          Duration timeExtension = Duration(
-                              minutes: currentTimeExtension ==
-                                  'Select Duration' ? 0 :
-                              int.parse(currentTimeExtension.split(' ')[0]));
+                  );
+                }
 
-
-                          await DatabaseService(
-                              whichQueue: widget.whichQueue,
-                              machineNumber: widget.machineNumber,
-                              location: 'Block ${widget.userQueueInstance.user
-                                  .block}')
-                              .grantExtension(
-                            queueInstance: widget.userQueueInstance,
-                            timeExtensionInMillis: timeExtension
-                                .inMilliseconds,
-                            queueDataList: DataInheritedWidget
-                                .of(context)
-                                .queueDataList,
-                          );
-
-                          //Notify isolates of this extensions (so the queue is not finished at the previous time)
-                          _notifyIsolateOfRemoval();
-
-                          //Also, save that at extension was granted for this queue
-                          _extensionGranted();
-                        }
-
-                        askingForExtension = true;
-
-                        //TODO: Implement method to extend time
-                      }),
-                  Offstage(
-                      offstage: !widget.enableQueuing,
-                      child: RaisedButton(
-                        child: Text('Queue for drier'),
-                        onPressed: () async {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChooseUsers(
-                                isWashing: false,
-                                isDrying: true,
-                                user: userQueueInstance.user,
-                                washerQueueInstance: userQueueInstance,
-                              ),
-                            ),
-                          );
-                        },
-                      ))
-                ],
-              ),
+                return Container();
+              },
             ),
-          );
-        }
+          ),
+        ],
+      ),
+      body: StreamBuilder(
+          stream: QueueProgressStream(
+                  type: 'till queueEnd', userQueue: userQueueInstance)
+              .stream,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Container();
+            }
 
-        return Container();
-      },);
+            return Stack(
+              children: <Widget>[
+                LiquidProgress(
+                  value: snapshot.data,
+                ),
+                Column(
+                  children: <Widget>[
+                    Expanded(
+                      flex: 5,
+                      child: isLandscape
+                          ? Center(
+                            child: Container(
+                              width: 150,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.greenAccent,
+                                      Colors.white,
+                                      Colors.grey[100]
+                                    ],
+                                  )),
+                              child: Center(
+                                  child: Text(
+                                '${(snapshot.data * 100).round()}%',
+                                style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700),
+                              )),
+                            ),
+                          )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: <Widget>[
+                                Container(
+                                  width: 180,
+                                  height: 180,
+                                  decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.greenAccent,
+                                          Colors.white,
+                                          Colors.grey[100]
+                                        ],
+                                      )),
+                                  child: Center(
+                                      child: Text(
+                                    '${(snapshot.data * 100).round()}%',
+                                    style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700),
+                                  )),
+                                ),
+                                Container(
+                                  width: 200,
+                                  child: Center(
+                                    child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(top: 16.0),
+                                        child: Text(
+                                          'Ends ${widget.userQueueInstance.displayableTime['endTime']}',
+                                        )),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                    getBottomButtons(isLandscape)
+                  ],
+                ),
+              ],
+            );
+          }),
+    );
   }
-
 }
-

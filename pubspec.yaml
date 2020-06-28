@@ -33,11 +33,20 @@ dependencies:
   firebase_storage: ^3.1.6
   image_picker: ^0.6.6+5
   fluttertoast: ^4.0.0
+  liquid_progress_indicator: ^0.3.2
+  google_fonts: ^1.1.0
+  flutter_email_sender: ^3.0.1
+  flutter_launcher_icons: ^0.7.3
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter_icons:
+  image_path: 'assets/images/ic_launcher.png'
+  android: true
+  ios: true
 
 
 # For information on the generic Dart part of this file, see the

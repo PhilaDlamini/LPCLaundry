@@ -253,6 +253,8 @@ class QueueIsolateHandler {
     await Preferences.getBoolData(Preferences.NOTIFY_ON_TURN);
     bool isNotifyingWhenDone =
     await Preferences.getBoolData(Preferences.NOTIFY_WHEN_DONE);
+    bool isNotifyingWhenQueuedJointly =
+    await Preferences.getBoolData(Preferences.NOTIFY_WHEN_QUEUED_JOINTLY);
 
     //First, remove any notifications that might have been scheduled before for this user
     if (isNotifyingOnTurn) {
@@ -265,8 +267,10 @@ class QueueIsolateHandler {
       await _notificationsPlugin.cancel(DRIER_NOTIFY_WHEN_DONE_ID);
     }
 
+    if(isNotifyingWhenQueuedJointly) {
       await _notificationsPlugin.cancel(QUEUED_JOINTLY_IN_DRIER);
       await _notificationsPlugin.cancel(QUEUED_JOINTLY_IN_WASHER);
+    }
 
     //Schedule the new notifications
     NotificationDetails notificationDetails = NotificationDetails(
@@ -352,21 +356,29 @@ class QueueIsolateHandler {
     }
 
     if(hasWasherQueueData && washerQueueData.queuedUnderOtherUser) {
-      _notificationsPlugin.show(
-          QUEUED_JOINTLY_IN_WASHER,
-          'You are washing with ${userWasherQueueInstance.user.name}',
-          '${userWasherQueueInstance.user.name} has queued to wash their clothes with you.'
-              ' Your turn starts at ${userWasherQueueInstance.displayableTime['startTime']}',
-          notificationDetails);
+      if (isNotifyingWhenQueuedJointly) {
+        _notificationsPlugin.show(
+            QUEUED_JOINTLY_IN_WASHER,
+            'You are washing with ${userWasherQueueInstance.user.name}',
+            '${userWasherQueueInstance.user
+                .name} has queued to wash their clothes with you.'
+                ' Your turn starts at ${userWasherQueueInstance
+                .displayableTime['startTime']}',
+            notificationDetails);
+      }
     }
 
     if(hasDrierQueueData && drierQueueData.queuedUnderOtherUser) {
-      _notificationsPlugin.show(
-          QUEUED_JOINTLY_IN_DRIER,
-          'You are drying with ${userDrierQueueInstance.user.name}',
-          '${userDrierQueueInstance.user.name} has queued to dry their clothes with you.'
-              ' Your turn starts at ${userDrierQueueInstance.displayableTime['startTime']}',
-          notificationDetails);
+      if (isNotifyingWhenQueuedJointly) {
+        _notificationsPlugin.show(
+            QUEUED_JOINTLY_IN_DRIER,
+            'You are drying with ${userDrierQueueInstance.user.name}',
+            '${userDrierQueueInstance.user
+                .name} has queued to dry their clothes with you.'
+                ' Your turn starts at ${userDrierQueueInstance
+                .displayableTime['startTime']}',
+            notificationDetails);
+      }
     }
   }
 

@@ -12,12 +12,12 @@ class Authenticate extends StatefulWidget{
 }
 
 class _AuthenticateState extends State<Authenticate> {
-
   bool _showSignIn = false;
 
   void toggleAuthenticate() {
     setState(() => _showSignIn = !_showSignIn);
   }
+
   @override
   Widget build(BuildContext context) {
 
@@ -25,5 +25,4 @@ class _AuthenticateState extends State<Authenticate> {
       body: _showSignIn ? SignIn(toggle: toggleAuthenticate) : Register(toggleWrapper: widget.toggleWrapper, toggle: toggleAuthenticate),
     );
   }
-
 }
