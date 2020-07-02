@@ -30,9 +30,8 @@ class _QueuePageState extends State<QueuePage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final List<String> durations = [
     'Select duration',
-    //TODO: These should be hardcoded, but update them to machine closely with downstairs
-    '2 minutes',
     '15 minutes',
+    '25 minutes',
     '35 minutes',
     '45 minutes',
     '60 minutes'

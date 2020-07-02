@@ -726,7 +726,7 @@ class DatabaseService {
     DocumentSnapshot snapshot = await queuedListReference.get();
 
     if (snapshot.data == null || snapshot.data['queue'].length == 0) {
-      return DateTime.now().add(Duration(seconds: 5)).millisecondsSinceEpoch; //TODO revert back to minutes
+      return DateTime.now().add(Duration(minutes: 5)).millisecondsSinceEpoch;
     }
 
     List<dynamic> queueList = snapshot.data['queue'];

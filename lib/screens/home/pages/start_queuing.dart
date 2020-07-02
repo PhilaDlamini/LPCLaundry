@@ -132,15 +132,23 @@ class _StartQueuingState extends State<StartQueuing> {
                     );
                   }
 
-                  return SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircleAvatar(
-                     // backgroundImage: NetworkImage(snapshot.data),
-                      backgroundColor: Colors.white70,
-                    ),
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircleAvatar(
+                          backgroundImage: NetworkImage(snapshot.data)
+                      ),
+                  ),
+                    )
+                    ],
                   );
-                },
+
+                  },
               ),
             ),
           )
