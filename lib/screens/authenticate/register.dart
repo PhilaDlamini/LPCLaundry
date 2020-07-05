@@ -32,7 +32,6 @@ class RegisterState extends State<Register> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool loading = false;
 
-
   Future _pickImage() async {
     var imageFile = await ImagePicker.pickImage(source: ImageSource.gallery);
     setState(() {
@@ -41,71 +40,65 @@ class RegisterState extends State<Register> {
   }
 
   void _start() async {
-      if (_formKey.currentState.validate()) {
-        if (_file != null) {
-          setState(() => loading = true);
+    if (_formKey.currentState.validate()) {
+      if (_file != null) {
+        setState(() => loading = true);
 
-          dynamic result =
-          await _auth.registerWithEmailAndPassword(
-              block: block,
-              name: name,
-              room: room,
-              email: lpcEmail,
-              file: _file,
-              password: password);
+        dynamic result = await _auth.registerWithEmailAndPassword(
+            block: block,
+            name: name,
+            room: room,
+            email: lpcEmail,
+            file: _file,
+            password: password);
 
-          if (result is PlatformException) {
-            setState(() => loading = false);
-            Scaffold.of(context).showSnackBar(
-              SnackBar(
-                duration: Duration(seconds: 3),
-                content: Text("Error: ${result.message}"),
-              ),
-            );
-          } else if (result == null) {
-            setState(() => loading = false);
-            Scaffold.of(context).showSnackBar(
-              SnackBar(
-                duration: Duration(seconds: 3),
-                content: Text(
-                    "Unknown error signing up. Please try again"),
-              ),
-            );
-          }
-
-          //Set up default SharedPreferences values
-          await Preferences.setDefaultPreferences();
-          widget.toggleWrapper();
-        } else {
+        if (result is PlatformException) {
+          setState(() => loading = false);
           Scaffold.of(context).showSnackBar(
-              SnackBar(content: Text('Select an image')));
+            SnackBar(
+              duration: Duration(seconds: 3),
+              content: Text("Error: ${result.message}"),
+            ),
+          );
+        } else if (result == null) {
+          setState(() => loading = false);
+          Scaffold.of(context).showSnackBar(
+            SnackBar(
+              duration: Duration(seconds: 3),
+              content: Text("Unknown error signing up. Please try again"),
+            ),
+          );
         }
+        widget.toggleWrapper();
+      } else {
+        Scaffold.of(context)
+            .showSnackBar(SnackBar(content: Text('Select an image')));
       }
+    }
   }
 
   Widget _getInputFields() {
     return Column(
       children: <Widget>[
-        textFormField('Email',
+        textFormField(
+          'Email',
           onChanged: (val) => lpcEmail = val.trim(),
-          validator: (text) =>
-          text.isEmpty ? 'Enter valid email' : null,
+          validator: (text) => text.isEmpty ? 'Enter valid email' : null,
         ),
         textFormField('Password',
             onChanged: (val) => password = val.trim(),
-            validator: (text) =>
-            text.isEmpty ? 'Enter valid password' : null,
+            validator: (text) => text.isEmpty ? 'Enter valid password' : null,
             obscureText: true),
         textFormField(
           'Block',
           onChanged: (val) => block = val.trim(),
-          validator: (text) =>
-          text.isEmpty ? 'Enter valid block' : null,
+          validator: (text) => text.isEmpty ? 'Enter valid block' : null,
         ),
-        textFormField('Room',
+        textFormField(
+          'Room',
           onChanged: (val) => room = val.trim(),
-          validator: (text) =>
-          text.isEmpty ? 'Eneter valid room' : null,),
+          validator: (text) => text.isEmpty ? 'Eneter valid room' : null,
+        ),
       ],
     );
   }
@@ -115,21 +108,22 @@ class RegisterState extends State<Register> {
       constraints: BoxConstraints(maxHeight: 85),
       child: Stack(
         children: <Widget>[
-         Container(
-            width: 80,
-            height: 80,
-           decoration: BoxDecoration(
-             shape: BoxShape.circle,
-             border: Border.all(
-               color: Colors.white,
-               width: 1,
-             )
-           ),
-           child:_file == null ? CircleAvatar(
-             backgroundColor: Colors.white,) :
-             CircleAvatar(backgroundImage: FileImage(_file),
-             )
-          ),
+          Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 1,
+                  )),
+              child: _file == null
+                  ? CircleAvatar(
+                      backgroundColor: Colors.white,
+                    )
+                  : CircleAvatar(
+                      backgroundImage: FileImage(_file),
+                    )),
           Container(
             // Is it only restricted to the height + width of the container
             width: 80,
@@ -142,9 +136,7 @@ class RegisterState extends State<Register> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.greenAccent
-                  ),
+                      shape: BoxShape.circle, color: Colors.greenAccent),
                   child: Center(
                     child: Icon(
                       Icons.camera_alt,
@@ -173,12 +165,10 @@ class RegisterState extends State<Register> {
                 constraints: BoxConstraints(maxWidth: 150),
                 child: TextFormField(
                     validator: (value) =>
-                    value.isEmpty ? "Enter a valid name" : null,
+                        value.isEmpty ? "Enter a valid name" : null,
                     onChanged: (newString) => name = newString.trim(),
                     decoration: InputDecoration.collapsed(
-                        hintText: "Name",
-                        hintStyle: TextStyle(fontSize: 15)
-                    )),
+                        hintText: "Name", hintStyle: TextStyle(fontSize: 15))),
               )
             ],
           ),
@@ -190,25 +180,24 @@ class RegisterState extends State<Register> {
           decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16))),
+                  topLeft: Radius.circular(16), topRight: Radius.circular(16))),
           child: Column(children: <Widget>[
             _getInputFields(),
-            Container(
-              width: 175,
-              margin: EdgeInsets.only(top: 32),
-              child: Row(children: <Widget>[
+            SizedBox(height: 32),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
                 roundedButton(
-                  onTapped: _start,
+                  text: 'Log in',
+                  onPressed: widget.toggle,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 4),
+                roundedButton(
+                  onPressed: _start,
                   text: 'Sign up',
                 ),
-                FlatButton(
-                  child: Text('Log in'),
-                  onPressed: widget.toggle,
-                  splashColor: Colors.yellow[100],
-                ),
               ],
-              ),
             ),
           ]),
         ),
@@ -221,40 +210,37 @@ class RegisterState extends State<Register> {
       children: <Widget>[
         Expanded(
           flex: 1,
-          child: Column(
-            children: <Widget> [
-              getImageSelector(),
-          Container(
-                    padding: EdgeInsets.only(left: 8.0),
-                    constraints: BoxConstraints(maxWidth: 150),
-                    child: TextFormField(
-                      textAlign: TextAlign.center,
-                        validator: (value) =>
-                        value.isEmpty ? "Enter a valid name" : null,
-                        onChanged: (newString) => name = newString.trim(),
-                        decoration: InputDecoration.collapsed(
-                            hintText: "Name",
-                            hintStyle: TextStyle(fontSize: 15)
-                        )),
-                  ),
-              Container(
-                width: 175,
-                margin: EdgeInsets.only(top: 32),
-                child: Row(children: <Widget>[
-                  roundedButton(
-                    color: Colors.white70,
-                    onTapped: _start,
-                    text: 'Start',
-                  ),
-                  FlatButton(
-                    child: Text('Sign in'),
-                    onPressed: widget.toggle,
-                    splashColor: Colors.yellow[100],
-                  ),
-                ],
+          child: Column(children: <Widget>[
+            getImageSelector(),
+            Container(
+              padding: EdgeInsets.only(left: 8.0),
+              constraints: BoxConstraints(maxWidth: 150),
+              child: TextFormField(
+                  textAlign: TextAlign.center,
+                  validator: (value) =>
+                      value.isEmpty ? "Enter a valid name" : null,
+                  onChanged: (newString) => name = newString.trim(),
+                  decoration: InputDecoration.collapsed(
+                      hintText: "Name", hintStyle: TextStyle(fontSize: 15))),
+            ),
+            SizedBox(height: 32),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                roundedButton(
+                  text: 'Sign in',
+                  onPressed: widget.toggle,
+                  color: Colors.yellow,
                 ),
-              ),
+                SizedBox(width: 4),
+                roundedButton(
+                  color: Colors.white70,
+                  onPressed: _start,
+                  text: 'Start',
+                ),
 
+              ],
+            ),
           ]),
         ),
         Expanded(
@@ -262,14 +248,15 @@ class RegisterState extends State<Register> {
           child: Container(
             height: height,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), topLeft: Radius.circular(16)),
-              color: Colors.white
-            ),
+                borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    topLeft: Radius.circular(16)),
+                color: Colors.white),
             child: SingleChildScrollView(
               child: _getInputFields(),
-              ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -286,11 +273,12 @@ class RegisterState extends State<Register> {
         : Scaffold(
             backgroundColor: Colors.yellow,
             body: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: isPortrait ? _portraitWidget(height, width) : _landscapeWidget(height, width),
-              )
-            ),
-    );
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: isPortrait
+                      ? _portraitWidget(height, width)
+                      : _landscapeWidget(height, width),
+                )),
+          );
   }
 }

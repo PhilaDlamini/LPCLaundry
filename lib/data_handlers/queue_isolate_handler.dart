@@ -276,8 +276,13 @@ class QueueIsolateHandler {
     NotificationDetails notificationDetails = NotificationDetails(
         AndroidNotificationDetails(
             CHANNEL_ID, CHANNEL_NAME, CHANNEL_DESCRIPTION,
-            styleInformation: BigTextStyleInformation('')),
-        IOSNotificationDetails());
+         //   sound: 'juntos', //For some reason it will not accept the string
+            priority: Priority.High,
+            importance: Importance.Max,
+            styleInformation: BigTextStyleInformation(''),
+        ),
+        IOSNotificationDetails(sound: 'juntos.aiff')
+    );
 
     if (hasWasherQueueData) {
       String correctPhrase = await getCorrectPhrase(userWasherQueueInstance);
@@ -314,9 +319,9 @@ class QueueIsolateHandler {
             DateTime.fromMillisecondsSinceEpoch(
                 userWasherQueueInstance.endTimeInMillis),
             notificationDetails);
+
       }
     }
-
     //Repeat the same for the drier data
     if (hasDrierQueueData) {
       String correctPhrase = await getCorrectPhrase(userDrierQueueInstance);

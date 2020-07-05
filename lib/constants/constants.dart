@@ -163,23 +163,24 @@ Widget profileEditTile(
   );
 }
 
-Widget roundedButton(
-    {Function onTapped, String text, Color color = Colors.yellow}) {
-  return InkWell(
-    onTap: onTapped,
+Widget roundedButton({Function onPressed, String text, Color color = Colors.yellow}) {
+  return RaisedButton(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(20))
+    ),
+    onPressed: onPressed,
     splashColor: Colors.yellow,
-    child: Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-      ),
-      child: Center(child: Text(text,
-        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black),)),
+    color: color,
+    elevation: 0,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Text(text,
+        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black),),
     ),
   );
 }
 
+//To remove this widget
 Widget flatButton({String text, Function onPressed}) {
   return FlatButton(
     splashColor: Colors.yellowAccent[100],

@@ -49,6 +49,7 @@ class AuthService {
     try {
       AuthResult result = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
+      await Preferences.setDefaultPreferences();
       return result.user != null
           ? User(uid: result.user.uid, currentlyQueued: false)
           : null;
@@ -79,6 +80,7 @@ class AuthService {
             currentlyQueued: false);
         await StorageService(file: file, user: user).uploadImage();
         await DatabaseService(user: user).setUserInfo();
+        await Preferences.setDefaultPreferences();
         return user;
       }
       return null;
@@ -89,9 +91,24 @@ class AuthService {
 
   // Signs the user user out
   Future<dynamic> signOut() async {
-    await Preferences.setDefaultPreferences();
     try {
       return await _auth.signOut();
+    } catch (e) {
+      return e;
+    }
+  }
+
+  //Enables the user to reset their password
+  Future sendPasswordResetEmail(String email) async {
+    bool isEmailSent = await Preferences.getBoolData(Preferences.PASSWORD_RESET_EMAIL_SENT);
+    try{
+      if(!isEmailSent) {
+        await _auth.sendPasswordResetEmail(email: email);
+        await Preferences.updateBoolData(Preferences.PASSWORD_RESET_EMAIL_SENT, true);
+      } else {
+        return 'The password reset email has already been sent to $email';
+        //This means that if the email was sent but then the user types in a different email, we will display this message :)
+      }
     } catch (e) {
       return e;
     }

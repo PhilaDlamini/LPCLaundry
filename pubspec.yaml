@@ -27,7 +27,7 @@ dependencies:
   provider: ^4.0.5
   flutter_spinkit: ^4.1.2+1
   cloud_firestore: ^0.13.5
-  flutter_local_notifications: ^1.4.3
+  flutter_local_notifications:
   shared_preferences: ^0.5.4
   equatable: ^0.6.0
   firebase_storage: ^3.1.6
@@ -37,6 +37,7 @@ dependencies:
   google_fonts: ^1.1.0
   flutter_email_sender: ^3.0.1
   flutter_launcher_icons: ^0.7.3
+  connectivity: ^0.4.9
 
 
 dev_dependencies:

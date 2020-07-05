@@ -7,6 +7,9 @@ import 'package:laundryqueue/models/User.dart';
 import 'package:laundryqueue/services/database.dart';
 import 'package:laundryqueue/services/storage.dart';
 import 'package:laundryqueue/widgets/loading.dart';
+import 'package:provider/provider.dart';
+import 'package:laundryqueue/widgets/disconnected.dart';
+import 'package:connectivity/connectivity.dart';
 
 class QueuePage extends StatefulWidget {
   final bool isWashing;
@@ -69,8 +72,8 @@ class _QueuePageState extends State<QueuePage> {
   }
 
   //Resets the machines
-  void _resetMachineList(List<String> machines){
-    for(String machine in machines) {
+  void _resetMachineList(List<String> machines) {
+    for (String machine in machines) {
       int index = machines.indexOf(machine);
       machines[index] = machine.split(' ')[0];
     }
@@ -162,7 +165,6 @@ class _QueuePageState extends State<QueuePage> {
 
   Future _getRecommendMachines() async {
     if (firstTimeBuilding) {
-
       //Firs, make sure the machines are reset (none have '(recommended)' behind in case this is the second time)
       _resetMachineList(washerMachines);
       _resetMachineList(drierMachines);
@@ -519,87 +521,87 @@ class _QueuePageState extends State<QueuePage> {
   @override
   Widget build(BuildContext context) {
     user = ModalRoute.of(context).settings.arguments;
+    ConnectivityResult connectivityResult =
+        Provider.of<ConnectivityResult>(context);
 
-    return FutureBuilder(
-      future: _getRecommendMachines(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Loading();
-        }
+    return connectivityResult != ConnectivityResult.none
+        ? FutureBuilder(
+            future: _getRecommendMachines(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return Loading();
+              }
 
-        return Scaffold(
-          backgroundColor: Colors.yellow,
-          appBar: AppBar(
-            elevation: 0,
-            title: Text('Queue in block ${user.block}',
-                style: TextStyle(color: Colors.black)),
-            leading: GestureDetector(
-              child: Icon(Icons.clear, color: Colors.black),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-          body: SingleChildScrollView(
-            child: Column(
-              children: <Widget>[
-                Container(
-                  padding: EdgeInsets.only(
-                    left: 16.0,
-                    right: 16.0,
-                    bottom: 32.0,
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Theme(
-                      data: ThemeData(
-                        canvasColor: Colors.blueGrey[100],
-                      ),
-                      child: Column(
-                        children: <Widget>[
-                          isWashing ? _getWasherCard() : Container(),
-                          isDrying ? _getDrierCard() : Container(),
-                        ],
-                      ),
-                    ),
+              return Scaffold(
+                backgroundColor: Colors.yellow,
+                appBar: AppBar(
+                  elevation: 0,
+                  title: Text('Queue in block ${user.block}',
+                      style: TextStyle(color: Colors.black)),
+                  leading: GestureDetector(
+                    child: Icon(Icons.clear, color: Colors.black),
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: queuingJointly
-                      ? Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            width: 180,
-                            child: Row(
+                body: SingleChildScrollView(
+                  child: Column(
+                    children: <Widget>[
+                      Container(
+                        padding: EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          bottom: 32.0,
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Theme(
+                            data: ThemeData(
+                              canvasColor: Colors.blueGrey[100],
+                            ),
+                            child: Column(
                               children: <Widget>[
-                                roundedButton(
-                                    onTapped: _queueUser,
-                                    color: Colors.white,
-                                    text: 'Queue'),
-                                roundedButton(
-                                  text: 'Others',
-                                  onTapped: () {
-                                    _showBottomSheet();
-                                  },
-                                )
+                                isWashing ? _getWasherCard() : Container(),
+                                isDrying ? _getDrierCard() : Container(),
                               ],
                             ),
                           ),
-                        )
-                      : Container(
-                          width: 100,
-                          child: roundedButton(
-                              onTapped: _queueUser,
-                              color: Colors.white,
-                              text: 'Queue'),
                         ),
-                )
-              ],
-            ),
-          ),
-        );
-      },
-    );
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: queuingJointly
+                            ? Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    roundedButton(
+                                      text: 'Others',
+                                      onPressed: () {
+                                        _showBottomSheet();
+                                      },
+                                    ),
+                                    SizedBox(width: 4),
+                                    roundedButton(
+                                        onPressed: _queueUser,
+                                        color: Colors.white,
+                                        text: 'Queue'),
+                                  ],
+                                ),
+                              )
+                            : roundedButton(
+                                onPressed: _queueUser,
+                                color: Colors.white,
+                                text: 'Queue'),
+                      )
+                    ],
+                  ),
+                ),
+              );
+            },
+          )
+        : Disconnected();
   }
 }

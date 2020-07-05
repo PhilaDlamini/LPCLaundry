@@ -14,180 +14,210 @@ class SignIn extends StatefulWidget {
 }
 
 class _SignInState extends State<SignIn> {
-
   final AuthService _auth = AuthService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   String email = '';
   String password = '';
   bool loading = false;
+  bool resettingPassword = false;
 
   void _logIn() async {
-      if (_formKey.currentState.validate()) {
-        setState(() => loading = true);
-        dynamic result =
-        await _auth.sigInWithEmailAndPassword(
-            email: email, password: password);
+    if (_formKey.currentState.validate()) {
+      setState(() => loading = true);
+      dynamic result = await _auth.sigInWithEmailAndPassword(
+          email: email, password: password);
 
-        if (result is PlatformException) {
-          setState(() => loading = false);
-          Scaffold.of(context).showSnackBar(
-            SnackBar(
-              duration: Duration(seconds: 3),
-              content: Text("Error: ${result.message}"),
-            ),
-          );
-        } else if (result == null) {
-          setState(() => loading = false);
-          Scaffold.of(context).showSnackBar(
-            SnackBar(
-              duration: Duration(seconds: 3),
-              content: Text("Error sigining in!"),
-            ),
-          );
-        }
+      if (result is PlatformException) {
+        setState(() => loading = false);
+        Scaffold.of(context).showSnackBar(
+          SnackBar(
+            duration: Duration(seconds: 3),
+            content: Text('Error: ${result.message}'),
+          ),
+        );
+      } else if (result == null) {
+        setState(() => loading = false);
+        Scaffold.of(context).showSnackBar(
+          SnackBar(
+            duration: Duration(seconds: 3),
+            content: Text('Error sigining in!'),
+          ),
+        );
       }
     }
+  }
+
+  Widget _buttons({bool row}) {
+    Widget confirmButton = roundedButton(
+      text: resettingPassword ? 'Submit' : 'Log in',
+      onPressed: resettingPassword
+          ? () async {
+              if (_formKey.currentState.validate()) {
+                dynamic result =
+                    await AuthService().sendPasswordResetEmail(email);
+
+                if (result is PlatformException) {
+                  Scaffold.of(context).showSnackBar(
+                    SnackBar(
+                      duration: Duration(seconds: 7),
+                      content: Text(result.message),
+                    ),
+                  );
+                } else if (result is String) {
+                  Scaffold.of(context).showSnackBar(
+                    SnackBar(
+                      duration: Duration(seconds: 7),
+                      content: Text(result),
+                    ),
+                  );
+                } else {
+                  Scaffold.of(context).showSnackBar(
+                    SnackBar(
+                      duration: Duration(seconds: 7),
+                      content: Text(
+                          'An email has been sent to $email. Click on the link to reset your password'),
+                    ),
+                  );
+                }
+              }
+            }
+          : _logIn,
+    );
+
+    Widget toggleButton = roundedButton(
+      color: Colors.white,
+      text: resettingPassword ? 'Cancel' : 'Sign up',
+      onPressed: resettingPassword
+          ? () {
+              setState(() => resettingPassword = false);
+            }
+          : widget.toggle,
+    );
+
+    return row
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              toggleButton,
+              SizedBox(width: 4),
+              confirmButton,
+            ],
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              toggleButton,
+              SizedBox(height: 16),
+              confirmButton,
+            ],
+          );
+  }
 
   Widget _getInputFields() {
     return Column(
       children: <Widget>[
         textFormField(
           'Email',
+          initialValue: email,
           onChanged: (val) => email = val.trim(),
-          validator: (text) =>
-          text.isEmpty ? "Please enter email" : null,
+          validator: (text) => text.isEmpty ? "Please enter email" : null,
         ),
-        textFormField(
-          'Password',
-          obscureText: true,
-          onChanged: (val) => password = val.trim(),
-          validator: (value) =>
-          value.isEmpty ? "Please enter password" : null,
+        Visibility(
+          visible: !resettingPassword,
+          child: textFormField(
+            'Password',
+            obscureText: true,
+            onChanged: (val) => password = val.trim(),
+            validator: (value) =>
+                value.isEmpty ? "Please enter password" : null,
+          ),
         ),
+        Visibility(
+          visible: !resettingPassword,
+          child: Container(
+            width: 250,
+            padding: EdgeInsets.only(top: 16),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => resettingPassword = true);
+              },
+              child: Text(
+                'Forgot password?',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.blueGrey[900],
+                ),
+              ),
+            ),
+          ),
+        )
       ],
     );
   }
 
   Widget _portraitWidget(double height) {
-    return Container(
-      height: height - 16,
-      color: Colors.white,
-      child: Center(
-        child: Container(
-            height: height / 1.8,
-            margin: EdgeInsets.all(8),
-            child: Column(children: <Widget>[
-              //  Icon(Icons.album, size: 32,),
-              authTitle('Log in to Laundry'),
-             _getInputFields(),
-              SizedBox(height: 32),
-              Container(
-                width: 175,
-                child: Row(children: <Widget>[
-                  roundedButton(
-                    text: "Log in",
-                    onTapped: _logIn,
-                  ),
-                  flatButton(
-                    text: 'Sign up',
-                    onPressed: widget.toggle,
-                  )
-                ]),
-              ),
-//                Padding( //TODO: Move this to the register screen (or not? I don't know)
-//                  padding: const EdgeInsets.all(8.0),
-//                  child: FlatButton(
-//                    child: Text("Sign in anonymously"),
-//                    onPressed: () async {
-//                      setState(() => loading = true);
-//                      Scaffold.of(context).showSnackBar(
-//                        SnackBar(
-//                          duration: Duration(seconds: 3),
-//                          content: Text("Temporarily disabled :)"),
-//                        ),
-//                      );
-//
-//                      dynamic result = await _auth.signInAnon();
-//
-//                      if(result is PlatformException) {
-//                      setState(() => loading = false);
-//                        Scaffold.of(context).showSnackBar(
-//                          SnackBar(
-//                            content: Text("Error: ${result.message}"),
-//                            duration: Duration(seconds: 3),
-//                          ),
-//                        );
-//                      } else if (result == null) {
-//                        setState(() => loading = false);
-//                        Scaffold.of(context).showSnackBar(
-//                          SnackBar(
-//                            content: Text("Couldn't sign in anonymously"),
-//                            duration: Duration(seconds: 3),
-//                          ),
-//                        );
-//                      }
-//                    },
-//                  ),
-//                ),
-            ])),
+    return Center(
+      child: Container(
+        height: height / 1.8,
+        margin: EdgeInsets.all(8),
+        child: Column(
+          children: <Widget>[
+            //  Icon(Icons.album, size: 32,),
+            authTitle(resettingPassword
+                ? 'Reset your password'
+                : 'Log in to Laundry'),
+            _getInputFields(),
+            SizedBox(height: 32),
+            _buttons(row: true),
+          ],
+        ),
       ),
     );
   }
 
   Widget _landscapeWidget(double height, double width) {
     double widgetWidth = width - 150;
-    return Container(
-      color: Colors.white,
-      height: height - 16,
-      padding: EdgeInsets.all(16),
-      child: Center(
-        child: Container(
-          width: widgetWidth,
-          child: Row(children: <Widget>[
-            Expanded(
-              flex: 3,
-              child: Column(children: <Widget>[
-                //  Icon(Icons.album, size: 32,),
+    return resettingPassword
+        ? Container(
+            width: width,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.only(top: 32.0),
-                  child: authTitle('Log in to Laundry'),
+                  child: authTitle('Reset your password'),
                 ),
                 _getInputFields(),
-              ]),
+                SizedBox(height: 24),
+                _buttons(row: true),
+              ],
             ),
-            Container(
-              margin: EdgeInsets.only(left: 48, top: 32, bottom: 32),
-              width: 1,
-              color: Colors.grey[400],
-            ),
-            Expanded(
-              flex: 3,
-              child: Center(
-                child: Container(
-                  width: 110,
-                  height: 120,
-                  margin: EdgeInsets.only(top: 48),
-                  child: Column(
-                      children: <Widget>[
-                    roundedButton(
-                      text: "Log in",
-                      onTapped: _logIn,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16.0),
-                      child: flatButton(
-                        text: 'Sign up',
-                        onPressed: widget.toggle,
+          )
+        : Center(
+            child: Container(
+              width: widgetWidth,
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    flex: 3,
+                    child: Column(children: <Widget>[
+                      //  Icon(Icons.album, size: 32,),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 32.0),
+                        child: authTitle('Log in to Laundry'),
                       ),
-                    )
-                  ]),
-                ),
+                      _getInputFields(),
+                    ]),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Center(child: _buttons(row: false)),
+                  ),
+                ],
               ),
             ),
-          ]),
-        ),
-      ),
-    );
+          );
   }
 
   @override
@@ -200,13 +230,19 @@ class _SignInState extends State<SignIn> {
     return loading
         ? Progress(message: 'Logging in')
         : Scaffold(
-            backgroundColor:Colors.yellow,
+            backgroundColor: Colors.yellow,
             body: Form(
               key: _formKey,
               child: SingleChildScrollView(
-                child:  isPortrait ? _portraitWidget(height) : _landscapeWidget(height, width)),
+                child: Container(
+                  height: height - 16,
+                  color: Colors.white,
+                  child: isPortrait
+                      ? _portraitWidget(height)
+                      : _landscapeWidget(height, width),
+                ),
+              ),
             ),
-            );
+          );
   }
-
 }

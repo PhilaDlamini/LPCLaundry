@@ -80,17 +80,14 @@ class Info extends StatelessWidget {
           Icon(Icons.card_membership, color: Colors.yellow[600],),
           width: 24
       ),
-     isFirstTime ? Container(
-       margin: EdgeInsets.only(right: width / 3, left:  width / 3, bottom: 16),
-        child: roundedButton(
-          color: Colors.blueGrey,
-          text: 'OK',
-          onTapped: () async {
-            await Preferences.updateBoolData(Preferences.FIRST_TIME_LOGGED_IN, false);
-            Navigator.pop(context);
-          }
-        )
-      ) : Container()
+     isFirstTime ? roundedButton(
+       color: Colors.blueGrey,
+       text: 'OK',
+       onPressed: () async {
+         await Preferences.updateBoolData(Preferences.FIRST_TIME_LOGGED_IN, false);
+         Navigator.pop(context);
+       }
+     ) : Container()
     ];
 
     return Scaffold(

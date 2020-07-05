@@ -22,11 +22,9 @@ class StartQueuing extends StatefulWidget {
 
   @override
   State<StatefulWidget> createState() => _StartQueuingState();
-
 }
 
 class _StartQueuingState extends State<StartQueuing> {
-
   void _toggle() {
     setState(() {});
   }
@@ -49,20 +47,35 @@ class _StartQueuingState extends State<StartQueuing> {
     return [washerQueue, drierQueue];
   }
 
-
-  Widget _summaryWidget(
-      QueueInstance washerInstance, QueueInstance drierInstance, double height) {
+  Widget _summaryWidget(QueueInstance washerInstance,
+      QueueInstance drierInstance, double height) {
     if (washerInstance != null && drierInstance != null) {
       return Column(
         children: <Widget>[
-          QueueSummary(queueInstance: washerInstance, title: 'Washer', toggle: _toggle,),
-          QueueSummary(queueInstance: drierInstance, title: 'Drier', toggle: _toggle,)
+          QueueSummary(
+            queueInstance: washerInstance,
+            title: 'Washer',
+            toggle: _toggle,
+          ),
+          QueueSummary(
+            queueInstance: drierInstance,
+            title: 'Drier',
+            toggle: _toggle,
+          )
         ],
       );
     } else if (washerInstance != null) {
-      return QueueSummary(queueInstance: washerInstance, title: 'Washer', toggle: _toggle,);
+      return QueueSummary(
+        queueInstance: washerInstance,
+        title: 'Washer',
+        toggle: _toggle,
+      );
     } else if (drierInstance != null) {
-      return QueueSummary(queueInstance: drierInstance, title: 'Drier', toggle: _toggle,);
+      return QueueSummary(
+        queueInstance: drierInstance,
+        title: 'Drier',
+        toggle: _toggle,
+      );
     }
 
     return Container(
@@ -117,57 +130,61 @@ class _StartQueuingState extends State<StartQueuing> {
         ),
         actions: <Widget>[
           GestureDetector(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: FutureBuilder(
-                future: StorageService(user: widget.user).getImageURL(),
-                builder: (context, snapshot) {
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: FutureBuilder(
+                  future: StorageService(user: widget.user).getImageURL(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return Container(
+                        width: 24,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.white,
+                        ),
+                      );
+                    }
 
-                  if (!snapshot.hasData) {
-                    return Container(
-                      width: 24,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.white,
-                      ),
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16.0),
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircleAvatar(
+                                backgroundImage: NetworkImage(snapshot.data)),
+                          ),
+                        )
+                      ],
                     );
-                  }
-
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16.0),
-                      child: SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircleAvatar(
-                          backgroundImage: NetworkImage(snapshot.data)
-                      ),
-                  ),
-                    )
-                    ],
-                  );
-
                   },
+                ),
               ),
-            ),
-          )
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => Profile(user: widget.user)),
+                );
+              })
         ],
       ),
       body: Container(
         height: height,
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20), topRight: Radius.circular(20)),
         ),
         child: SingleChildScrollView(
           child: FutureBuilder(
             future: getQueueData(),
             builder: (context, snapshot) {
               if (snapshot.hasData) {
-                return _summaryWidget(snapshot.data[0], snapshot.data[1], height);
+                return _summaryWidget(
+                    snapshot.data[0], snapshot.data[1], height);
               }
               return Container();
             },

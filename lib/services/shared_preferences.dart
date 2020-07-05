@@ -14,7 +14,8 @@ class Preferences {
   static const String WASHER_QUEUE_EXTENSION_GRANTED = 'Washer queue extension';
   static const String DRIER_QUEUE_EXTENSION_GRANTED = 'Drier queue extension';
   static const String FIRST_TIME_LOGGED_IN = 'First time logged in';
-  static const String VERIFICATION_EMAIL_SENT = 'Email sent';
+  static const String VERIFICATION_EMAIL_SENT = 'Verification email sent';
+  static const String PASSWORD_RESET_EMAIL_SENT = 'Password reset email sent';
 
   //The descriptions for the checkboxes. Used in Settings.dart
   static const String NOTIFY_ON_TURN_DESCRIPTION = "Receive a notification when your turn in the queue is near";
@@ -27,6 +28,7 @@ class Preferences {
     await updateBoolData(NOTIFY_WHEN_DONE, true);
     await updateBoolData(NOTIFY_WHEN_QUEUED_JOINTLY, true);
     await updateBoolData(VERIFICATION_EMAIL_SENT, false);
+    await updateBoolData(PASSWORD_RESET_EMAIL_SENT, false);
     await updateBoolData(WASHER_USE_CONFIRMED, false);
     await updateBoolData(DRIER_USE_CONFIRMED, false);
     await updateBoolData(WASHER_QUEUE_REMOVED_AT_TIME, false);

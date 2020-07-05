@@ -6,13 +6,13 @@ import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/inherited_widgets/data_inherited_widget.dart';
 import 'package:laundryqueue/models/QueueInstance.dart';
 import 'package:laundryqueue/models/User.dart';
+import 'package:laundryqueue/screens/drawer_pages/profile.dart';
 import 'package:laundryqueue/screens/home/pages/choose.dart';
 import 'package:laundryqueue/services/queue_isolate.dart';
 import 'package:laundryqueue/services/storage.dart';
 import 'package:laundryqueue/streams/count_down.dart';
 import 'package:laundryqueue/streams/queue_progress_stream.dart';
 import 'package:laundryqueue/widgets/custom_list_tile.dart';
-import 'package:laundryqueue/widgets/user_item.dart';
 
 class QueueListBase extends StatefulWidget {
   final List<QueueInstance> usersInQueue;
@@ -25,15 +25,15 @@ class QueueListBase extends StatefulWidget {
   final bool hideAppBar;
   final bool queuedUnderOtherUser;
 
-  QueueListBase({
-      this.usersInQueue,
+  QueueListBase(
+      {this.usersInQueue,
       this.toggle,
       this.enableQueuing,
       this.userQueueInstance,
       this.hideAppBar = false,
       this.whichQueue,
       this.machineNumber,
-    this.queuedUnderOtherUser,
+      this.queuedUnderOtherUser,
       this.machineType});
 
   @override
@@ -206,32 +206,46 @@ class _QueueListBaseState extends State<QueueListBase> {
               title: Text('Block ${user.block} queue'),
               actions: <Widget>[
                 GestureDetector(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: FutureBuilder(
-                      future: StorageService(user: user).getImageURL(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return Container(
-                            width: 24,
-                            child: CircleAvatar(
-                              backgroundColor: Colors.white,
-                            ),
-                          );
-                        }
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: FutureBuilder(
+                        future: StorageService(user: user).getImageURL(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Container(
+                              width: 24,
+                              child: CircleAvatar(
+                                backgroundColor: Colors.white,
+                              ),
+                            );
+                          }
 
-                        return SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircleAvatar(
-                            // backgroundImage: NetworkImage(snapshot.data),
-                            backgroundColor: Colors.white70,
-                          ),
-                        );
-                      },
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16.0),
+                                child: SizedBox(
+                                  width: 26,
+                                  height: 26,
+                                  child: CircleAvatar(
+                                      backgroundImage:
+                                          NetworkImage(snapshot.data)),
+                                ),
+                              )
+                            ],
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                )
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => Profile(user: user),
+                        ),
+                      );
+                    })
               ],
             ),
       body: Container(
@@ -265,7 +279,8 @@ class _QueueListBaseState extends State<QueueListBase> {
                   );
                 }
 
-                bool isMe = widgetDataList[index].user.uid == userQueue.user.uid;
+                bool isMe =
+                    widgetDataList[index].user.uid == userQueue.user.uid;
                 return CustomListTile(
                     usersQueuedWith: widgetDataList[index].usersQueuedWith,
                     queueInstance: widgetDataList[index],
@@ -274,10 +289,8 @@ class _QueueListBaseState extends State<QueueListBase> {
                     machineNumber: widget.machineNumber,
                     queuedUnderOtherUser: widget.queuedUnderOtherUser,
                     queueDataList:
-                    DataInheritedWidget.of(context).queueDataList,
-                    isMe: isMe
-                );
-
+                        DataInheritedWidget.of(context).queueDataList,
+                    isMe: isMe);
               },
             ),
           ],
