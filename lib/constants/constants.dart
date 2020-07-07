@@ -128,7 +128,7 @@ Widget feedbackTextInput({Function onChanged, Function validator, String hintTex
       );
 }
 
-Widget profileDataTile({Icon icon, String title, String value}) {
+Widget profileDataTile({Icon icon, String title, String value, Widget trailing}) {
   return ListTile(
     contentPadding: EdgeInsets.all(0),
     leading: Column(
@@ -144,6 +144,7 @@ Widget profileDataTile({Icon icon, String title, String value}) {
     subtitle: Text(value,
         style: TextStyle(fontSize: 16, color: Colors.grey[900])
     ),
+    trailing: trailing != null ? trailing : Container(width: 0,),
   );
 }
 
@@ -376,9 +377,10 @@ Widget infoExtendButton() {
 void showToast(String message) {
   Fluttertoast.showToast(
       msg: message,
-      backgroundColor: Colors.blueGrey[200],
-      textColor: Colors.black,
-      toastLength: Toast.LENGTH_SHORT,
+      backgroundColor: Colors.grey[50],
+      textColor: Colors.grey[900],
+      fontSize: 14,
+      toastLength: Toast.LENGTH_LONG,
       gravity: ToastGravity.BOTTOM);
 }
 

@@ -80,13 +80,16 @@ class Info extends StatelessWidget {
           Icon(Icons.card_membership, color: Colors.yellow[600],),
           width: 24
       ),
-     isFirstTime ? roundedButton(
-       color: Colors.blueGrey,
-       text: 'OK',
-       onPressed: () async {
-         await Preferences.updateBoolData(Preferences.FIRST_TIME_LOGGED_IN, false);
-         Navigator.pop(context);
-       }
+     isFirstTime ? Container(
+       padding: EdgeInsets.only(bottom: 16, right: width / 3, left: width / 3),
+       child: roundedButton(
+         color: Colors.blueGrey,
+         text: 'OK',
+         onPressed: () async {
+           await Preferences.updateBoolData(Preferences.FIRST_TIME_LOGGED_IN, false);
+           Navigator.pop(context);
+         }
+       ),
      ) : Container()
     ];
 

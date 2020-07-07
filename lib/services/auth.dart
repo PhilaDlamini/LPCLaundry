@@ -44,12 +44,13 @@ class AuthService {
   }
 
   //Sign in with email and password
-  Future<dynamic> sigInWithEmailAndPassword(
-      {String email, String password}) async {
+  Future<dynamic> sigInWithEmailAndPassword({String email, String password, bool initiatePreferences = true}) async {
     try {
       AuthResult result = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
-      await Preferences.setDefaultPreferences();
+      if(initiatePreferences) {
+        await Preferences.setDefaultPreferences();
+      }
       return result.user != null
           ? User(uid: result.user.uid, currentlyQueued: false)
           : null;
@@ -109,6 +110,16 @@ class AuthService {
         return 'The password reset email has already been sent to $email';
         //This means that if the email was sent but then the user types in a different email, we will display this message :)
       }
+    } catch (e) {
+      return e;
+    }
+  }
+
+  //Updates the email of the current user
+  Future updateEmail(String email) async {
+    try {
+      FirebaseUser user = await _auth.currentUser();
+      await user.updateEmail(email);
     } catch (e) {
       return e;
     }

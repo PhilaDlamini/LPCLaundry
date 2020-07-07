@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:laundryqueue/models/User.dart';
+import 'package:laundryqueue/screens/drawer_pages/profile.dart';
 import 'package:laundryqueue/services/auth.dart';
 import 'package:laundryqueue/constants/constants.dart';
 import 'package:laundryqueue/widgets/progress.dart';
 
 class SignIn extends StatefulWidget {
   final Function toggle;
+  final bool isChangingEmail;
+  final User user; //Only passed in if the user is changing emails
 
-  SignIn({this.toggle});
+  SignIn({this.toggle, this.isChangingEmail = false, this.user});
 
   @override
   State<StatefulWidget> createState() => _SignInState();
@@ -20,12 +26,25 @@ class _SignInState extends State<SignIn> {
   String password = '';
   bool loading = false;
   bool resettingPassword = false;
+  bool isChangingEmail;
+
+  void _showSnackBar(BuildContext context) {
+    Timer.run(() {
+      if (isChangingEmail) {
+        Scaffold.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign in to your account to change your email'),
+          ),
+        );
+      }
+    });
+  }
 
   void _logIn() async {
     if (_formKey.currentState.validate()) {
       setState(() => loading = true);
       dynamic result = await _auth.sigInWithEmailAndPassword(
-          email: email, password: password);
+          email: email, password: password, initiatePreferences: false);
 
       if (result is PlatformException) {
         setState(() => loading = false);
@@ -40,9 +59,23 @@ class _SignInState extends State<SignIn> {
         Scaffold.of(context).showSnackBar(
           SnackBar(
             duration: Duration(seconds: 3),
-            content: Text('Error sigining in!'),
+            content: Text('Error signing in!'),
           ),
         );
+      } else {
+        //If there is no error
+        //If we came here from Profile, then it won't rebuild as we are in a different route. Go back
+        if (isChangingEmail) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Profile(
+                user: widget.user,
+                fromSignIn: true,
+              ),
+            ),
+          );
+        }
       }
     }
   }
@@ -98,7 +131,10 @@ class _SignInState extends State<SignIn> {
         ? Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              toggleButton,
+              Visibility(
+                visible: !isChangingEmail,
+                child: toggleButton,
+              ),
               SizedBox(width: 4),
               confirmButton,
             ],
@@ -106,7 +142,10 @@ class _SignInState extends State<SignIn> {
         : Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              toggleButton,
+              Visibility(
+                visible: !isChangingEmail,
+                child: toggleButton,
+              ),
               SizedBox(height: 16),
               confirmButton,
             ],
@@ -133,7 +172,7 @@ class _SignInState extends State<SignIn> {
           ),
         ),
         Visibility(
-          visible: !resettingPassword,
+          visible: !resettingPassword && !isChangingEmail,
           child: Container(
             width: 250,
             padding: EdgeInsets.only(top: 16),
@@ -156,7 +195,9 @@ class _SignInState extends State<SignIn> {
     );
   }
 
-  Widget _portraitWidget(double height) {
+  Widget _portraitWidget(BuildContext context, double height) {
+    _showSnackBar(context);
+
     return Center(
       child: Container(
         height: height / 1.8,
@@ -176,8 +217,11 @@ class _SignInState extends State<SignIn> {
     );
   }
 
-  Widget _landscapeWidget(double height, double width) {
+  Widget _landscapeWidget(BuildContext context, double height, double width) {
     double widgetWidth = width - 150;
+
+    _showSnackBar(context);
+
     return resettingPassword
         ? Container(
             width: width,
@@ -221,6 +265,12 @@ class _SignInState extends State<SignIn> {
   }
 
   @override
+  void initState() {
+    isChangingEmail = widget.isChangingEmail;
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     MediaQueryData mediaQueryData = MediaQuery.of(context);
     bool isPortrait = mediaQueryData.orientation == Orientation.portrait;
@@ -231,15 +281,17 @@ class _SignInState extends State<SignIn> {
         ? Progress(message: 'Logging in')
         : Scaffold(
             backgroundColor: Colors.yellow,
-            body: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                child: Container(
-                  height: height - 16,
-                  color: Colors.white,
-                  child: isPortrait
-                      ? _portraitWidget(height)
-                      : _landscapeWidget(height, width),
+            body: Builder(
+              builder: (context) => Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Container(
+                    height: height - 16,
+                    color: Colors.white,
+                    child: isPortrait
+                        ? _portraitWidget(context, height)
+                        : _landscapeWidget(context, height, width),
+                  ),
                 ),
               ),
             ),
