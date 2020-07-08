@@ -80,6 +80,18 @@ class _SignInState extends State<SignIn> {
     }
   }
 
+  Widget _appIcon() {
+    return  Visibility(
+      visible: !resettingPassword,
+      child: Container(
+        height: 35,
+        child: Image(
+            image: AssetImage('assets/images/washer_1.png')
+        ),
+      ),
+    );
+  }
+
   Widget _buttons({bool row}) {
     Widget confirmButton = roundedButton(
       text: resettingPassword ? 'Submit' : 'Log in',
@@ -200,11 +212,12 @@ class _SignInState extends State<SignIn> {
 
     return Center(
       child: Container(
-        height: height / 1.8,
+        height: height / 1.6,
         margin: EdgeInsets.all(8),
         child: Column(
           children: <Widget>[
-            //  Icon(Icons.album, size: 32,),
+            _appIcon(),
+            SizedBox(height: 8),
             authTitle(resettingPassword
                 ? 'Reset your password'
                 : 'Log in to Laundry'),
@@ -246,11 +259,12 @@ class _SignInState extends State<SignIn> {
                   Expanded(
                     flex: 3,
                     child: Column(children: <Widget>[
-                      //  Icon(Icons.album, size: 32,),
                       Padding(
                         padding: const EdgeInsets.only(top: 32.0),
-                        child: authTitle('Log in to Laundry'),
+                        child: _appIcon(),
                       ),
+                      SizedBox(height: 8),
+                      authTitle('Log in to Laundry'),
                       _getInputFields(),
                     ]),
                   ),
