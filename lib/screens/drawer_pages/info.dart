@@ -111,8 +111,8 @@ class Info extends StatelessWidget {
               GestureDetector(
                 child: Icon(Icons.clear),
                 onTap: () {
-                  Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
-                },
+                  Navigator.pop(context);
+                  },
               ),
               elevation: 0,
               title: Padding(

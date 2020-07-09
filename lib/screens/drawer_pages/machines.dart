@@ -109,7 +109,7 @@ class _MachinesState extends State<Machines> {
           leading: GestureDetector(
             child: Icon(Icons.clear, color: Colors.black),
             onTap: () {
-              Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
+              Navigator.pop(context);
             },
           ),
           actions: <Widget>[popupMenuButton(context, user: widget.user)],

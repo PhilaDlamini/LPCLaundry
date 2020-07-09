@@ -80,7 +80,7 @@ class SettingsState extends State<Settings> {
                 leading: GestureDetector(
                   child: Icon(Icons.clear, color: Colors.black),
                   onTap: () {
-                    Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
+                    Navigator.pop(context);
                   },
                 ),
               ),

@@ -364,9 +364,12 @@ class _ProfileState extends State<Profile> {
             color: Colors.black,
           ),
           onTap: () {
-            Navigator.popUntil(
-                context, ModalRoute.withName(Navigator.defaultRouteName));
-          },
+            if(widget.fromSignIn) {
+              Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
+            } else {
+              Navigator.pop(context);
+            }
+          }
         ),
         title: Text('Profile', style: TextStyle(color: Colors.black)),
         actions: <Widget>[

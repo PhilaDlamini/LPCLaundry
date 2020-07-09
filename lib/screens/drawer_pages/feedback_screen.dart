@@ -28,7 +28,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           leading: GestureDetector(
               child: Icon(Icons.clear),
               onTap: () {
-                Navigator.popUntil(context, ModalRoute.withName(Navigator.defaultRouteName));
+                Navigator.pop(context);
               }
           ),
           title: Text('Feedback'),
