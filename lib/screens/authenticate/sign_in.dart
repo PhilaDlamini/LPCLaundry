@@ -86,7 +86,7 @@ class _SignInState extends State<SignIn> {
       child: Container(
         height: 35,
         child: Image(
-            image: AssetImage('assets/images/washer_1.png')
+            image: AssetImage('assets/images/washer_3.png')
         ),
       ),
     );
