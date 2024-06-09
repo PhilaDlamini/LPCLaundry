@@ -1,16 +1,5 @@
-# laundryqueue
+LPCLaundry is a mobile application built for Li Po Chun United World College of Hong Kong to help streamline the laundry process.
 
-An app for queing for laundry 
+Students at Li Po Chun can see machine availability before going to the laundry room, and can queue up to do laundry right from the app. When their turn comes, they are notified and can then go to the laundry room and do their laundry.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+LPCLaundry is built with Flutter, allowing it to run on both iOS and Android.
